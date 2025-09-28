@@ -1,0 +1,37 @@
+# Spring Boot
+spring_boot_backend/target/
+spring_boot_backend/.mvn/wrapper/maven-wrapper.jar
+spring_boot_backend/mvnw
+spring_boot_backend/mvnw.cmd
+
+# Flutter/Dart
+flutter_app/build/
+flutter_app/.dart_tool/
+flutter_app/.packages
+flutter_app/.pub-cache/
+flutter_app/.pub/
+flutter_app/.metadata
+flutter_app/pubspec.lock
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
