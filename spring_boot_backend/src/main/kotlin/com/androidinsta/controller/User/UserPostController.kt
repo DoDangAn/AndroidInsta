@@ -1,39 +1,54 @@
-package com.androidinsta.controller.user
+package com.androidinsta.controller.User
 
+import com.androidinsta.DTO.PostCreateRequest
+import com.androidinsta.DTO.PostUpdateRequest
 import com.androidinsta.model.Post
-import com.androidinsta.model.Visibility
-import com.androidinsta.service.user.PostService
+import com.androidinsta.DTO.PostResponse
+import com.androidinsta.DTO.toPostResponse
+import com.androidinsta.Service.User.PostService
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/user/posts")
-class UserPostController(private val postService: PostService) {
+class PostController(private val postService: PostService) {
 
+    // Lấy tất cả post
     @GetMapping
-    fun getAllPosts() = postService.getAllPosts()
+    fun getAllPosts(): List<PostResponse> =
+        postService.getAllPosts()
 
+    // Lấy các post của 1 user
     @GetMapping("/user/{userId}")
-    fun getPostsByUser(@PathVariable userId: Long) = postService.getPostsByUser(userId)
+    fun getPostsByUser(@PathVariable userId: Long): List<PostResponse> =
+        postService.getPostsByUser(userId)
 
+    // Lấy 1 post theo postId
     @GetMapping("/{postId}")
-    fun getPostById(@PathVariable postId: Long) = postService.getPostById(postId)
+    fun getPostById(@PathVariable postId: Long): PostResponse =
+        postService.getPostById(postId)
 
+    // Tạo post mới
     @PostMapping
-    fun createPost(@RequestBody post: Post) = postService.createPost(post)
+    fun createPost(@RequestBody request: PostCreateRequest): PostResponse {
+        val post: Post = postService.createPost(request)
+        return post.toPostResponse()
+    }
 
+
+
+    // Cập nhật post
     @PutMapping("/{postId}")
-    fun updatePost(@PathVariable postId: Long,
-                   @RequestParam userId: Long,
-                   @RequestBody request: PostUpdateRequest) =
+    fun updatePost(
+        @PathVariable postId: Long,
+        @RequestParam userId: Long,
+        @RequestBody request: PostUpdateRequest
+    ): PostResponse =
         postService.updatePost(postId, userId, request.caption, request.visibility)
 
+    // Xóa post
     @DeleteMapping("/{postId}")
-    fun deletePost(@PathVariable postId: Long,
-                   @RequestParam userId: Long) =
-        postService.deletePost(postId, userId)
+    fun deletePost(
+        @PathVariable postId: Long,
+        @RequestParam userId: Long
+    ) = postService.deletePost(postId, userId)
 }
-
-data class PostUpdateRequest(
-    val caption: String?,
-    val visibility: Visibility?
-)
