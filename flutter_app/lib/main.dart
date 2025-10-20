@@ -1,101 +1,129 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
+import 'screens/HomeScreen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const AndroidInstaApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+class AndroidInstaApp extends StatelessWidget {
+  const AndroidInstaApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AndroidInsta',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.purple,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: const MyHomePage(title: 'AndroidInsta - Flutter & Spring Boot'),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const SplashScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
+        '/home': (context) => const HomeScreen(),
+      },
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  final String title;
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({Key? key}) : super(key: key);
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  String _message = 'Click button to test API connection';
-  bool _isLoading = false;
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthStatus();
+  }
 
-  Future<void> _testApiConnection() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+  Future<void> _checkAuthStatus() async {
+    // Add a small delay for splash effect
+    await Future.delayed(const Duration(seconds: 2));
+    
     try {
-      // Replace with your actual Spring Boot backend URL
-      final response = await http.get(
-        Uri.parse('http://localhost:8081/api/hello'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          _message = data['message'] ?? 'Connected to Spring Boot!';
-        });
-      } else {
-        setState(() {
-          _message = 'Error: ${response.statusCode}';
-        });
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      
+      if (mounted) {
+        if (token != null && token.isNotEmpty) {
+          // User is logged in, go to home
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          // User not logged in, go to login
+          Navigator.pushReplacementNamed(context, '/login');
+        }
       }
     } catch (e) {
-      setState(() {
-        _message = 'Connection failed: $e';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      // Error checking auth, go to login
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
+      backgroundColor: Colors.purple,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'Flutter + Spring Boot Demo',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          children: [
+            // Logo
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: const Icon(
+                Icons.camera_alt,
+                color: Colors.purple,
+                size: 60,
+              ),
             ),
-            const SizedBox(height: 20),
-            _isLoading
-                ? const CircularProgressIndicator()
-                : Text(
-                    _message,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                    textAlign: TextAlign.center,
-                  ),
+            const SizedBox(height: 24),
+            
+            // App name
+            const Text(
+              'AndroidInsta',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            const Text(
+              'Share your moments',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 48),
+            
+            // Loading indicator
+            const SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                strokeWidth: 3,
+              ),
+            ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _testApiConnection,
-        tooltip: 'Test API',
-        child: const Icon(Icons.refresh),
       ),
     );
   }

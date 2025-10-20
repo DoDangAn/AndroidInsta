@@ -1,24 +1,68 @@
-# AndroidInsta - Flutter + Spring Boot Kotlin Project
+# AndroidInsta - Instagram Clone with Flutter + Spring Boot Kotlin
 
-Dự án demo kết hợp Flutter frontend và Spring Boot backend với Kotlin.
+🚀 **Dự án Instagram clone hoàn chỉnh với authentication JWT và REST API**
 
-## Cấu trúc dự án
+## ✨ Tính năng đã triển khai
+
+### 🔐 **Authentication System:**
+- ✅ User Registration & Login
+- ✅ JWT Access & Refresh Tokens  
+- ✅ Password Encryption (BCrypt)
+- ✅ Role-based Authorization (USER/ADMIN)
+- ✅ Token Refresh & Logout
+- ✅ Change Password
+
+### 📱 **API Features:**
+- ✅ RESTful API với Spring Boot
+- ✅ JWT Security Filter
+- ✅ Input Validation
+- ✅ CORS Support
+- ✅ Error Handling
+- ✅ Database Integration (H2)
+
+## 🏗️ Cấu trúc dự án
 
 ```
 AndroidInsta/
-├── flutter_app/          # Flutter mobile application
+├── flutter_app/                    # Flutter mobile application
 │   ├── lib/
-│   │   └── main.dart     # Flutter app chính
-│   └── pubspec.yaml      # Dependencies của Flutter
-├── spring_boot_backend/   # Spring Boot Kotlin backend
-│   ├── src/main/kotlin/
-│   │   └── com/androidinsta/
-│   │       ├── AndroidInstaApplication.kt
-│   │       └── controller/
-│   │           └── ApiController.kt
-│   ├── build.gradle.kts  # Gradle build file
+│   │   ├── main.dart              # Flutter app chính
+│   │   └── database/
+│   │       └── database_helper.dart
+│   └── pubspec.yaml               # Dependencies của Flutter
+├── spring_boot_backend/           # Spring Boot Kotlin backend
+│   ├── src/main/kotlin/com/androidinsta/
+│   │   ├── Model/                 # JPA Entities
+│   │   │   ├── User.kt           # User model với JWT
+│   │   │   ├── Role.kt           # User roles
+│   │   │   ├── Post.kt           # Posts với media files
+│   │   │   ├── Comment.kt        # Comments system
+│   │   │   ├── Like.kt           # Likes system
+│   │   │   ├── Follow.kt         # Follow system
+│   │   │   └── ...               # Các models khác
+│   │   ├── Repository/           # Data access layer
+│   │   │   ├── UserRepository.kt
+│   │   │   ├── RoleRepository.kt
+│   │   │   └── RefreshTokenRepository.kt
+│   │   ├── Service/              # Business logic
+│   │   │   └── AuthService.kt    # Authentication service
+│   │   ├── controller/           # REST Controllers
+│   │   │   ├── AuthController.kt # Auth endpoints
+│   │   │   └── TestController.kt # Health check
+│   │   ├── config/               # Security & JWT config
+│   │   │   ├── SecurityConfig.kt # Spring Security
+│   │   │   ├── JwtUtil.kt        # JWT utilities
+│   │   │   ├── JwtAuthenticationFilter.kt
+│   │   │   └── ...               # Các config khác
+│   │   └── dto/                  # Data Transfer Objects
+│   │       ├── AuthDto.kt        # Auth DTOs
+│   │       └── UserDto.kt        # User DTOs
+│   ├── build.gradle.kts          # Gradle build với JWT deps
+│   ├── API_DOCS.md               # 📚 API Documentation
+│   ├── TEST_API.md               # 🧪 Test Scripts
 │   └── src/main/resources/
-│       └── application.properties
+│       └── application.properties # App config với JWT
+├── AUTHENTICATION_SUMMARY.md      # 📋 Tổng quan authentication
 └── README.md
 ```
 
