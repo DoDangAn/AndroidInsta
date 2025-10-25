@@ -1,7 +1,7 @@
 package com.androidinsta.config
 
 import com.androidinsta.Model.Role
-import com.androidinsta.Repository.RoleRepository
+import com.androidinsta.Repository.User.RoleRepository
 import org.springframework.boot.CommandLineRunner
 import org.springframework.stereotype.Component
 

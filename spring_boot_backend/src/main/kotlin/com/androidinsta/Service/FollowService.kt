@@ -1,7 +1,7 @@
 package com.androidinsta.Service
 
 import com.androidinsta.Model.Follow
-import com.androidinsta.Repository.UserRepository
+import com.androidinsta.Repository.User.UserRepository
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
 import org.springframework.stereotype.Service

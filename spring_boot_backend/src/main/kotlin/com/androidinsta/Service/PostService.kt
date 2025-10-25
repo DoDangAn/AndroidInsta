@@ -5,7 +5,7 @@ import com.androidinsta.Model.Visibility
 import com.androidinsta.Model.MediaFile
 import com.androidinsta.Model.MediaType
 import com.androidinsta.Repository.User.PostRepository
-import com.androidinsta.Repository.UserRepository
+import com.androidinsta.Repository.User.UserRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service

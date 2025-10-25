@@ -1,8 +1,8 @@
-package com.androidinsta.controller
+package com.androidinsta.controller.User
 
 import com.androidinsta.Model.MessageType
 import com.androidinsta.Service.MessageService
-import com.androidinsta.Repository.UserRepository
+import com.androidinsta.Repository.User.UserRepository
 import com.androidinsta.config.SecurityUtil
 import com.androidinsta.dto.*
 import org.springframework.data.domain.PageRequest

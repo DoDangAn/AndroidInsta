@@ -1,4 +1,4 @@
-package com.androidinsta.Repository
+package com.androidinsta.Repository.User
 
 import com.androidinsta.Model.User
 import org.springframework.data.jpa.repository.JpaRepository

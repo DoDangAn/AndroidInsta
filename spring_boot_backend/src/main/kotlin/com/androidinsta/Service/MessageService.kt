@@ -3,7 +3,7 @@ package com.androidinsta.Service
 import com.androidinsta.Model.Message
 import com.androidinsta.Model.MessageType
 import com.androidinsta.Repository.MessageRepository
-import com.androidinsta.Repository.UserRepository
+import com.androidinsta.Repository.User.UserRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.messaging.simp.SimpMessagingTemplate

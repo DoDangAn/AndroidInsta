@@ -2,13 +2,12 @@ package com.androidinsta.controller
 
 import com.androidinsta.dto.*
 import com.androidinsta.Model.User
-import com.androidinsta.Repository.UserRepository
+import com.androidinsta.Repository.User.UserRepository
 import com.androidinsta.config.SecurityUtil
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.web.bind.annotation.*
-import java.time.LocalDateTime
 
 @RestController
 @RequestMapping("/api/users")
