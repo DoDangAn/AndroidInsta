@@ -1,9 +1,16 @@
-gradle/
+# ------------------------------
+# Gradle
+# ------------------------------
+.gradle/
 !gradle/wrapper/gradle-wrapper.jar
+.gradle/buildOutputCleanup/
+build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### STS ###
+# ------------------------------
+# Eclipse / STS
+# ------------------------------
 .apt_generated
 .classpath
 .factorypath
@@ -15,8 +22,10 @@ bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
-### IntelliJ IDEA ###
-.idea
+# ------------------------------
+# IntelliJ IDEA
+# ------------------------------
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -24,15 +33,22 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
-### NetBeans ###
+# ------------------------------
+# NetBeans
+# ------------------------------
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
+# ------------------------------
+# VS Code
+# ------------------------------
 .vscode/
 
-### Build ###
-build/
+# ------------------------------
+# OS Files
+# ------------------------------
+.DS_Store
+Thumbs.db
