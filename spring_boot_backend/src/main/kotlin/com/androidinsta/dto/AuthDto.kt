@@ -11,7 +11,7 @@ data class LoginRequest(
 
     @field:NotBlank(message = "Password is required")
     @field:Size(min = 6, message = "Password must be at least 6 characters")
-    val password: String
+    val password: String,
 )
 
 // Register Request DTO
@@ -45,4 +45,33 @@ data class ChangePasswordRequest(
     @field:NotBlank(message = "New password is required")
     @field:Size(min = 6, message = "New password must be at least 6 characters")
     val newPassword: String
+)
+
+// User Info DTO
+data class UserInfo(
+    val id: Long?,
+    val username: String,
+    val email: String,
+    val roles: List<String>
+)
+
+// JWT Response DTO (returned on successful login/register)
+data class JwtResponse(
+    val accessToken: String,
+    val refreshToken: String,
+    val expiresIn: Long,
+    val user: UserInfo
+)
+
+// Token Refresh Response DTO
+data class TokenRefreshResponse(
+    val accessToken: String,
+    val expiresIn: Long
+)
+
+// Generic Authentication Response
+data class AuthResponse(
+    val success: Boolean,
+    val message: String,
+    val data: JwtResponse? = null
 )

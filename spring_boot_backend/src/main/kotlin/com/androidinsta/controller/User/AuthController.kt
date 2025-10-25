@@ -1,7 +1,7 @@
-package com.androidinsta.controller
+package com.androidinsta.controller.User
 
 import com.androidinsta.Service.AuthService
-import com.androidinsta.config.*
+import com.androidinsta.config.SecurityUtil
 import com.androidinsta.dto.*
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
@@ -14,8 +14,7 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = ["*"])
 class AuthController(
-    private val authService: AuthService,
-    private val securityUtil: SecurityUtil
+    private val authService: AuthService
 ) {
 
     @PostMapping("/login")
@@ -91,10 +90,16 @@ class AuthController(
     @PostMapping("/logout")
     fun logout(request: HttpServletRequest): ResponseEntity<*> {
         return try {
-            val userId = securityUtil.getCurrentUserId()
+            val userId = SecurityUtil.getCurrentUserId()
                 ?: throw RuntimeException("User not authenticated")
             
-            authService.logout(userId)
+            // Extract access token from header
+            val authHeader = request.getHeader("Authorization")
+            val accessToken = if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                authHeader.substring(7)
+            } else null
+            
+            authService.logout(userId, accessToken)
             ResponseEntity.ok(
                 mapOf(
                     "success" to true,
@@ -114,7 +119,7 @@ class AuthController(
     @PostMapping("/change-password")
     fun changePassword(@Valid @RequestBody changePasswordRequest: ChangePasswordRequest): ResponseEntity<*> {
         return try {
-            val userId = securityUtil.getCurrentUserId()
+            val userId = SecurityUtil.getCurrentUserId()
                 ?: throw RuntimeException("User not authenticated")
             
             authService.changePassword(userId, changePasswordRequest)
@@ -144,7 +149,7 @@ class AuthController(
     @GetMapping("/me")
     fun getCurrentUser(): ResponseEntity<*> {
         return try {
-            val userId = securityUtil.getCurrentUserId()
+            val userId = SecurityUtil.getCurrentUserId()
                 ?: throw RuntimeException("User not authenticated")
             
             ResponseEntity.ok(
@@ -153,8 +158,8 @@ class AuthController(
                     "message" to "User info retrieved successfully",
                     "data" to mapOf(
                         "userId" to userId,
-                        "username" to securityUtil.getCurrentUsername(),
-                        "isAuthenticated" to securityUtil.isAuthenticated()
+                        "username" to SecurityUtil.getCurrentUsername(),
+                        "isAuthenticated" to SecurityUtil.isAuthenticated()
                     )
                 )
             )
@@ -186,8 +191,8 @@ class AuthController(
                 "success" to true,
                 "message" to "Token is valid",
                 "data" to mapOf(
-                    "isAuthenticated" to securityUtil.isAuthenticated(),
-                    "userId" to securityUtil.getCurrentUserId()
+                    "isAuthenticated" to SecurityUtil.isAuthenticated(),
+                    "userId" to SecurityUtil.getCurrentUserId()
                 )
             )
         )

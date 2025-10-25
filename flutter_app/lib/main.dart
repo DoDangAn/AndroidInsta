@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
-import 'screens/HomeScreen.dart';
+import 'screens/home_screen.dart';
 
 void main() {
   runApp(const AndroidInstaApp());
 }
-
 class AndroidInstaApp extends StatelessWidget {
   const AndroidInstaApp({Key? key}) : super(key: key);
 

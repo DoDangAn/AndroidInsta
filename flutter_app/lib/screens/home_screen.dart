@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/login_service.dart';
+import 'chat_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -27,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       if (token != null) {
         // Verify token and get user info
-        final userInfo = await LoginService.getCurrentUser(token);
+        await LoginService.getCurrentUser(token);
         
         setState(() {
           _username = prefs.getString('username') ?? '';
@@ -235,8 +236,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     Colors.orange,
                     'Chat with friends',
                     () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Messages feature coming soon!')),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChatListScreen(),
+                        ),
                       );
                     },
                   ),

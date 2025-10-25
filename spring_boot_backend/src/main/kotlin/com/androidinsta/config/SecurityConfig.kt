@@ -52,6 +52,7 @@ class SecurityConfig(
                     .requestMatchers("/h2-console/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/posts/public/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/posts/advertise").permitAll()
+                    .requestMatchers("/ws/**").permitAll() // WebSocket endpoint
                     .requestMatchers("/error").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
                     
@@ -61,6 +62,7 @@ class SecurityConfig(
                     // User endpoints
                     .requestMatchers("/api/users/**").hasAnyRole("USER", "ADMIN")
                     .requestMatchers("/api/posts/**").hasAnyRole("USER", "ADMIN")
+                    .requestMatchers("/api/chat/**").hasAnyRole("USER", "ADMIN")
                     .requestMatchers("/api/comments/**").hasAnyRole("USER", "ADMIN")
                     .requestMatchers("/api/messages/**").hasAnyRole("USER", "ADMIN")
                     .requestMatchers("/api/notifications/**").hasAnyRole("USER", "ADMIN")

@@ -28,7 +28,7 @@ data class MediaFile(
 
 @Entity
 @Table(name = "posts")
-data class Post(
+class Post(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
@@ -52,20 +52,20 @@ data class Post(
     )
     val mediaFiles: List<MediaFile> = emptyList(),
 
-    @Column(name = "created_at", nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now(),
+    @Column(name = "created_at", nullable = false, updatable = false)
+    var createdAt: LocalDateTime? = null,
 
     @Column(name = "updated_at")
-    val updatedAt: LocalDateTime? = null,
+    var updatedAt: LocalDateTime? = null,
 
-    @OneToMany(mappedBy = "post", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
-    val comments: List<Comment> = emptyList(),
+    @OneToMany(mappedBy = "post", cascade = [CascadeType.ALL], fetch = FetchType.LAZY, orphanRemoval = true)
+    val comments: MutableList<Comment> = mutableListOf(),
 
-    @OneToMany(mappedBy = "post", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
-    val likes: List<Like> = emptyList(),
+    @OneToMany(mappedBy = "post", cascade = [CascadeType.ALL], fetch = FetchType.LAZY, orphanRemoval = true)
+    val likes: MutableSet<Like> = mutableSetOf(),
 
-    @OneToMany(mappedBy = "post", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
-    val savedPosts: List<SavedPost> = emptyList(),
+    @OneToMany(mappedBy = "post", cascade = [CascadeType.ALL], fetch = FetchType.LAZY, orphanRemoval = true)
+    val savedPosts: MutableSet<SavedPost> = mutableSetOf(),
 
     @ManyToMany
     @JoinTable(
@@ -73,6 +73,28 @@ data class Post(
         joinColumns = [JoinColumn(name = "post_id")],
         inverseJoinColumns = [JoinColumn(name = "tag_id")]
     )
-    val tags: List<Tag> = emptyList()
-)
- 
+    val tags: MutableSet<Tag> = mutableSetOf()
+) {
+
+    @PrePersist
+    fun onPrePersist() {
+        createdAt = LocalDateTime.now()
+    }
+
+    @PreUpdate
+    fun onPreUpdate() {
+        updatedAt = LocalDateTime.now()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        other as Post
+        if (id == 0L && other.id == 0L) return false
+        return id == other.id
+    }
+
+    override fun hashCode(): Int {
+        return id.hashCode()
+    }
+}

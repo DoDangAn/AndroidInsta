@@ -16,7 +16,8 @@ import java.time.LocalDateTime
 class UserController(
     private val userRepository: UserRepository,
     private val securityUtil: SecurityUtil,
-    private val passwordEncoder: PasswordEncoder
+    private val passwordEncoder: PasswordEncoder,
+    private val followService: com.androidinsta.Service.FollowService
 ) {
 
     @GetMapping("/profile")
@@ -115,6 +116,74 @@ class UserController(
                 )
             )
         }
+    }
+
+    /**
+     * POST /api/users/{userId}/follow - Follow a user
+     */
+    @PostMapping("/{userId}/follow")
+    fun followUser(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
+        val currentUserId = SecurityUtil.getCurrentUserId()
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf(
+                "success" to false,
+                "message" to "Unauthorized"
+            ))
+
+        return try {
+            val followed = followService.followUser(currentUserId, userId)
+            ResponseEntity.ok(mapOf(
+                "success" to followed,
+                "message" to if (followed) "User followed successfully" else "Already following this user"
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "success" to false,
+                "message" to (e.message ?: "Follow failed")
+            ))
+        }
+    }
+
+    /**
+     * DELETE /api/users/{userId}/follow - Unfollow a user
+     */
+    @DeleteMapping("/{userId}/follow")
+    fun unfollowUser(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
+        val currentUserId = SecurityUtil.getCurrentUserId()
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf(
+                "success" to false,
+                "message" to "Unauthorized"
+            ))
+
+        return try {
+            val unfollowed = followService.unfollowUser(currentUserId, userId)
+            ResponseEntity.ok(mapOf(
+                "success" to unfollowed,
+                "message" to if (unfollowed) "User unfollowed successfully" else "Not following this user"
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "success" to false,
+                "message" to (e.message ?: "Unfollow failed")
+            ))
+        }
+    }
+
+    /**
+     * GET /api/users/{userId}/stats - Get user stats
+     */
+    @GetMapping("/{userId}/stats")
+    fun getUserStats(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
+        val currentUserId = SecurityUtil.getCurrentUserId()
+
+        return ResponseEntity.ok(mapOf(
+            "success" to true,
+            "stats" to mapOf(
+                "followersCount" to followService.getFollowersCount(userId),
+                "followingCount" to followService.getFollowingCount(userId),
+                "isFollowing" to if (currentUserId != null) 
+                    followService.isFollowing(currentUserId, userId) else false
+            )
+        ))
     }
 }
 

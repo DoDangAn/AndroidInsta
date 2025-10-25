@@ -15,7 +15,9 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class PostService(
     private val postRepository: PostRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val kafkaProducerService: KafkaProducerService,
+    private val redisService: RedisService
 ) {
     
     /**
@@ -76,7 +78,19 @@ class PostService(
             mediaFiles = mediaFilesList
         )
         
-        return postRepository.save(post)
+        val savedPost = postRepository.save(post)
+        
+        // Send Kafka event for post creation
+        kafkaProducerService.sendPostCreatedEvent(
+            postId = savedPost.id,
+            userId = userId,
+            content = caption
+        )
+        
+        // Invalidate user cache
+        redisService.invalidateUserCache(userId)
+        
+        return savedPost
     }
     
     /**

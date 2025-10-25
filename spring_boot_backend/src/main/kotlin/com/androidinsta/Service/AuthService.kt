@@ -1,9 +1,19 @@
 package com.androidinsta.Service
 
-import com.androidinsta.Model.*
-import com.androidinsta.Repository.*
-import com.androidinsta.config.*
-import com.androidinsta.dto.*
+import com.androidinsta.Model.User
+import com.androidinsta.Model.RefreshToken
+import com.androidinsta.Repository.UserRepository
+import com.androidinsta.Repository.RoleRepository
+import com.androidinsta.Repository.RefreshTokenRepository
+import com.androidinsta.config.JwtUtil
+import com.androidinsta.config.JwtProperties
+import com.androidinsta.dto.LoginRequest
+import com.androidinsta.dto.RegisterRequest
+import com.androidinsta.dto.JwtResponse
+import com.androidinsta.dto.TokenRefreshRequest
+import com.androidinsta.dto.TokenRefreshResponse
+import com.androidinsta.dto.ChangePasswordRequest
+import com.androidinsta.dto.UserInfo
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -18,7 +28,9 @@ class AuthService(
     private val refreshTokenRepository: RefreshTokenRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtUtil: JwtUtil,
-    private val jwtProperties: JwtProperties
+    private val jwtProperties: JwtProperties,
+    private val redisService: RedisService,
+    private val kafkaProducerService: KafkaProducerService
 ) {
 
     fun login(loginRequest: LoginRequest): JwtResponse {
@@ -70,6 +82,14 @@ class AuthService(
         )
 
         val savedUser = userRepository.save(newUser)
+        
+        // Send user registered event to Kafka
+        kafkaProducerService.sendUserRegisteredEvent(
+            userId = savedUser.id,
+            username = savedUser.username,
+            email = savedUser.email
+        )
+        
         return generateTokens(savedUser)
     }
 
@@ -79,6 +99,11 @@ class AuthService(
 
         // Kiểm tra token có bị revoke không
         if (refreshToken.revoked) {
+            throw RuntimeException("Refresh token has been revoked")
+        }
+
+        // Check if refresh token is blacklisted in Redis
+        if (redisService.isTokenBlacklisted(refreshToken.token)) {
             throw RuntimeException("Refresh token has been revoked")
         }
 
@@ -109,12 +134,28 @@ class AuthService(
         )
     }
 
-    fun logout(userId: Long) {
+    fun logout(userId: Long, accessToken: String? = null) {
         val user = userRepository.findById(userId)
             .orElseThrow { RuntimeException("User not found") }
         
+        // Blacklist current access token if provided
+        if (accessToken != null) {
+            try {
+                val expirationDate = jwtUtil.getExpirationDateFromToken(accessToken)
+                val remainingMillis = expirationDate.time - System.currentTimeMillis()
+                if (remainingMillis > 0) {
+                    redisService.blacklistToken(accessToken, remainingMillis)
+                }
+            } catch (e: Exception) {
+                // Token might be invalid, ignore
+            }
+        }
+        
         // Revoke tất cả refresh tokens của user
         refreshTokenRepository.revokeAllUserTokens(user)
+        
+        // Invalidate user cache
+        redisService.invalidateUserCache(userId)
     }
 
     fun changePassword(userId: Long, changePasswordRequest: ChangePasswordRequest) {

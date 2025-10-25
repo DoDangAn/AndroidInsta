@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 // Demo Login Service cho Flutter App
 class LoginService {
-  static const String baseUrl = 'http://localhost:8081/api/auth';
+  static const String baseUrl = 'http://10.0.2.2:8081/api/auth';
   
   // Login method
   static Future<LoginResponse> login(String usernameOrEmail, String password) async {
