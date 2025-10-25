@@ -1,5 +1,3 @@
-import 'package:flutter_app/screens/FeedScreen.dart';
-
 class UserProfile {
   final int id;
   final String username;

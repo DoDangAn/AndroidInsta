@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 
 class ProfileService {
-  static const String _baseUrl = 'http://localhost:8081/api/admin/profile';
+  static const String _baseUrl = 'http://10.0.2.2:8081/api/admin/profile';
 
   static Future<UserProfile> fetchUserProfile(int userId) async {
     final prefs = await SharedPreferences.getInstance();
