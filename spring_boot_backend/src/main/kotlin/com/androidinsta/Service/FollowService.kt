@@ -14,6 +14,9 @@ interface FollowRepository : JpaRepository<Follow, Long> {
     fun deleteByFollowerIdAndFollowedId(followerId: Long, followedId: Long)
     fun countByFollowerId(followerId: Long): Long
     fun countByFollowedId(followedId: Long): Long
+    
+    @org.springframework.data.jpa.repository.Query("SELECT f.followed.id FROM Follow f WHERE f.follower.id = :followerId")
+    fun findFollowedUserIds(@org.springframework.data.repository.query.Param("followerId") followerId: Long): List<Long>
 }
 
 @Service
@@ -22,7 +25,8 @@ class FollowService(
     private val followRepository: FollowRepository,
     private val userRepository: UserRepository,
     private val kafkaProducerService: KafkaProducerService,
-    private val redisService: RedisService
+    private val redisService: RedisService,
+    private val notificationService: NotificationService
 ) {
 
     fun followUser(followerId: Long, followedId: Long): Boolean {
@@ -50,12 +54,13 @@ class FollowService(
         // Send Kafka event
         kafkaProducerService.sendUserFollowedEvent(followerId, followedId)
 
-        // Send notification
-        kafkaProducerService.sendNotificationEvent(
-            userId = followedId,
-            title = "New Follower",
-            message = "${follower.username} started following you",
-            type = "FOLLOW"
+        // Gửi notification
+        notificationService.sendNotification(
+            receiverId = followedId,
+            senderId = followerId,
+            type = com.androidinsta.Model.NotificationType.FOLLOW,
+            entityId = null,
+            message = "${follower.username} đã bắt đầu theo dõi bạn"
         )
 
         // Invalidate caches

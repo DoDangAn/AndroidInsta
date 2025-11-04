@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 // Demo Login Service cho Flutter App
 class LoginService {
-  static const String baseUrl = 'http://10.0.2.2:8081/api/auth';
+  static const String baseUrl = ApiConfig.authUrl;
   
   // Login method
   static Future<LoginResponse> login(String usernameOrEmail, String password) async {

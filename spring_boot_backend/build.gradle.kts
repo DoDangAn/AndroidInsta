@@ -40,6 +40,9 @@ dependencies {
     // Kafka for event-driven architecture
     implementation("org.springframework.kafka:spring-kafka")
     
+    // Cloudinary for video/image storage
+    implementation("com.cloudinary:cloudinary-http44:1.36.0")
+    
     // JWT Dependencies
     implementation("io.jsonwebtoken:jjwt-api:0.12.3")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.3")

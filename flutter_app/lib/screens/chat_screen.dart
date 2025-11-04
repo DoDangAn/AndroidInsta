@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:convert';
 import '../services/chat_service.dart';
+import '../models/chat_models.dart';
 
 class ChatScreen extends StatefulWidget {
   final UserSummary user;

@@ -1,27 +1,39 @@
-package com.androidinsta.DTO
+package com.androidinsta.dto
 
-import com.androidinsta.model.Visibility
+import com.androidinsta.Model.Visibility
 import java.time.LocalDateTime
-import com.androidinsta.model.Post
+import com.androidinsta.Model.Post
 
-data class UserResponse(
+data class PostUserResponse(
     val id: Long,
     val username: String
 )
 
+data class PostMediaFile(
+    val fileUrl: String,
+    val fileType: String,
+    val orderIndex: Int,
+    val duration: Int? = null,
+    val thumbnailUrl: String? = null
+)
+
 data class PostResponse(
     val id: Long,
-    val user: UserResponse,
+    val user: PostUserResponse,
     val caption: String?,
     val visibility: Visibility,
-    val createdAt: LocalDateTime,
+    val mediaFiles: List<PostMediaFile> = emptyList(),
+    val likeCount: Long = 0,
+    val commentCount: Long = 0,
+    val isLiked: Boolean = false,
+    val createdAt: LocalDateTime?,
     val updatedAt: LocalDateTime?
 )
 
 // Extension function chuyển từ Post -> PostResponse
 fun Post.toPostResponse() = PostResponse(
     id = this.id,
-    user = UserResponse(
+    user = PostUserResponse(
         id = this.user.id,
         username = this.user.username
     ),

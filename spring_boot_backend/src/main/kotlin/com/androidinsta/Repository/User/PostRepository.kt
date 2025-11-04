@@ -57,4 +57,16 @@ interface PostRepository : JpaRepository<Post, Long> {
         ORDER BY p.createdAt DESC
     """)
     fun findAdvertisePosts(pageable: Pageable): Page<Post>
+    
+    /**
+     * Tìm kiếm posts theo từ khóa (caption hoặc username)
+     */
+    @Query("""
+        SELECT DISTINCT p FROM Post p 
+        LEFT JOIN p.user u 
+        WHERE LOWER(p.caption) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%'))
+        ORDER BY p.createdAt DESC
+    """)
+    fun searchPosts(@Param("keyword") keyword: String, pageable: Pageable): Page<Post>
 }

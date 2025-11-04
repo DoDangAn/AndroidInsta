@@ -37,6 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('access_token', response.data!.accessToken);
         await prefs.setString('refresh_token', response.data!.refreshToken);
+        // Save user id for easy profile navigation
+        await prefs.setInt('user_id', response.data!.user.id);
         await prefs.setString('username', response.data!.user.username);
         await prefs.setString('email', response.data!.user.email);
         

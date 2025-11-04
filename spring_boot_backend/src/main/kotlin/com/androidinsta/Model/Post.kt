@@ -15,7 +15,7 @@ enum class MediaType {
 
 @Embeddable
 data class MediaFile(
-    @Column(name = "file_url", nullable = false, length = 255)
+    @Column(name = "file_url", nullable = false, length = 500)
     val fileUrl: String,
 
     @Enumerated(EnumType.STRING)
@@ -23,7 +23,16 @@ data class MediaFile(
     val fileType: MediaType = MediaType.IMAGE,
 
     @Column(name = "order_index", nullable = false)
-    val orderIndex: Int = 1
+    val orderIndex: Int = 1,
+
+    @Column(name = "cloudinary_public_id", length = 255)
+    val cloudinaryPublicId: String? = null,
+
+    @Column(name = "duration")
+    val duration: Int? = null,
+
+    @Column(name = "thumbnail_url", length = 500)
+    val thumbnailUrl: String? = null
 )
 
 @Entity

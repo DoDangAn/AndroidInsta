@@ -2,9 +2,9 @@ package com.androidinsta.Service
 
 import com.androidinsta.Model.User
 import com.androidinsta.Model.RefreshToken
-import com.androidinsta.Repository.UserRepository
-import com.androidinsta.Repository.RoleRepository
-import com.androidinsta.Repository.RefreshTokenRepository
+import com.androidinsta.Repository.User.UserRepository
+import com.androidinsta.Repository.User.RoleRepository
+import com.androidinsta.Repository.User.RefreshTokenRepository
 import com.androidinsta.config.JwtUtil
 import com.androidinsta.config.JwtProperties
 import com.androidinsta.dto.LoginRequest

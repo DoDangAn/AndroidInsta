@@ -23,7 +23,9 @@ class LikeService(
     private val postRepository: PostRepository,
     private val userRepository: UserRepository,
     private val kafkaProducerService: KafkaProducerService,
-    private val redisService: RedisService
+    private val redisService: RedisService,
+    private val notificationService: NotificationService,
+    private val friendshipRepository: com.androidinsta.Repository.User.FriendshipRepository
 ) {
 
     fun likePost(userId: Long, postId: Long): Boolean {
@@ -47,13 +49,14 @@ class LikeService(
         // Send Kafka event
         kafkaProducerService.sendPostLikedEvent(postId, userId)
 
-        // Send notification to post owner if different user
-        if (post.user.id != userId) {
-            kafkaProducerService.sendNotificationEvent(
-                userId = post.user.id,
-                title = "New Like",
-                message = "${user.username} liked your post",
-                type = "LIKE"
+        // Gửi notification cho chủ bài viết (chỉ khi là bạn bè)
+        if (post.user.id != userId && friendshipRepository.areFriends(userId, post.user.id)) {
+            notificationService.sendNotification(
+                receiverId = post.user.id,
+                senderId = userId,
+                type = com.androidinsta.Model.NotificationType.LIKE,
+                entityId = postId,
+                message = "${user.username} đã thích bài viết của bạn"
             )
         }
 

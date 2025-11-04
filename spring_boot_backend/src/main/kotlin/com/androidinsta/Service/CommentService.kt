@@ -11,7 +11,10 @@ import org.springframework.transaction.annotation.Transactional
 @Repository
 interface CommentRepository : JpaRepository<Comment, Long> {
     fun findByPostIdOrderByCreatedAtDesc(postId: Long): List<Comment>
+    fun findByPostIdAndParentCommentIsNullOrderByCreatedAtDesc(postId: Long): List<Comment>
+    fun findByParentCommentIdOrderByCreatedAtAsc(parentCommentId: Long): List<Comment>
     fun countByPostId(postId: Long): Long
+    fun countByParentCommentId(parentCommentId: Long): Int
 }
 
 @Service
@@ -20,19 +23,28 @@ class CommentService(
     private val commentRepository: CommentRepository,
     private val postRepository: PostRepository,
     private val userRepository: UserRepository,
-    private val kafkaProducerService: KafkaProducerService
+    private val kafkaProducerService: KafkaProducerService,
+    `private val notificationService: NotificationService,
+    private val friendshipRepository: com.androidinsta.Repository.User.FriendshipRepository
 ) {
 
-    fun addComment(userId: Long, postId: Long, content: String): Comment {
+    fun addComment(userId: Long, postId: Long, content: String, parentCommentId: Long? = null): Comment {
         val user = userRepository.findById(userId)
             .orElseThrow { RuntimeException("User not found") }
         val post = postRepository.findById(postId)
             .orElseThrow { RuntimeException("Post not found") }
 
+        // Nếu là reply, kiểm tra parent comment tồn tại
+        val parentComment = parentCommentId?.let { 
+            commentRepository.findById(it)
+                .orElseThrow { RuntimeException("Parent comment not found") }
+        }
+
         val comment = Comment(
             user = user,
             post = post,
-            content = content
+            content = content,
+            parentComment = parentComment
         )
 
         val savedComment = commentRepository.save(comment)
@@ -45,14 +57,29 @@ class CommentService(
             content = content
         )
 
-        // Send notification to post owner if different user
-        if (post.user.id != userId) {
-            kafkaProducerService.sendNotificationEvent(
-                userId = post.user.id,
-                title = "New Comment",
-                message = "${user.username} commented on your post",
-                type = "COMMENT"
-            )
+        // Gửi notification (chỉ khi là bạn bè)
+        if (parentComment != null) {
+            // Reply comment - gửi cho người được reply
+            if (parentComment.user.id != userId && friendshipRepository.areFriends(userId, parentComment.user.id)) {
+                notificationService.sendNotification(
+                    receiverId = parentComment.user.id,
+                    senderId = userId,
+                    type = com.androidinsta.Model.NotificationType.REPLY,
+                    entityId = postId,
+                    message = "${user.username} đã trả lời bình luận của bạn: \"$content\""
+                )
+            }
+        } else {
+            // Comment gốc - gửi cho chủ bài viết
+            if (post.user.id != userId && friendshipRepository.areFriends(userId, post.user.id)) {
+                notificationService.sendNotification(
+                    receiverId = post.user.id,
+                    senderId = userId,
+                    type = com.androidinsta.Model.NotificationType.COMMENT,
+                    entityId = postId,
+                    message = "${user.username} đã bình luận về bài viết của bạn: \"$content\""
+                )
+            }
         }
 
         return savedComment
@@ -70,10 +97,19 @@ class CommentService(
     }
 
     fun getPostComments(postId: Long): List<Comment> {
-        return commentRepository.findByPostIdOrderByCreatedAtDesc(postId)
+        // Chỉ lấy comments gốc (không có parent)
+        return commentRepository.findByPostIdAndParentCommentIsNullOrderByCreatedAtDesc(postId)
+    }
+
+    fun getCommentReplies(commentId: Long): List<Comment> {
+        return commentRepository.findByParentCommentIdOrderByCreatedAtAsc(commentId)
     }
 
     fun getCommentCount(postId: Long): Long {
         return commentRepository.countByPostId(postId)
+    }
+
+    fun getRepliesCount(commentId: Long): Int {
+        return commentRepository.countByParentCommentId(commentId)
     }
 }

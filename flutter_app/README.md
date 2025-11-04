@@ -1,16 +1,69 @@
-# flutter_app
+# AndroidInsta Flutter App
 
-A new Flutter project.
+Flutter frontend cho ứng dụng mạng xã hội AndroidInsta.
 
-## Getting Started
+## 🚀 Setup
 
-This project is a starting point for a Flutter application.
+### 1. Cài đặt dependencies
+```bash
+flutter pub get
+```
 
-A few resources to get you started if this is your first Flutter project:
+### 2. Cấu hình Backend URL
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+File: `lib/config/api_config.dart`
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+**Android Emulator:** `http://10.0.2.2:8081`  
+**iOS Simulator:** `http://localhost:8081`  
+**Physical Device:** `http://192.168.1.x:8081` (thay x bằng IP của máy)
+
+### 3. Chạy Backend
+```bash
+cd ../spring_boot_backend
+./gradlew bootRun
+```
+
+### 4. Chạy App
+```bash
+flutter run
+```
+
+## 📱 Features
+
+- ✅ Authentication (Login/Register/Logout)
+- ✅ Home Screen với user info
+- ✅ Profile Screen (view user, follow/unfollow)
+- ✅ Chat (WebSocket real-time messaging)
+- ✅ Posts feed & user posts
+- ✅ Auto token management with SharedPreferences
+
+## 📡 API Endpoints
+
+- **Auth:** `/api/auth/*` (login, register, me, logout)
+- **Users:** `/api/users/*` (profile, follow, stats)
+- **Posts:** `/api/posts/*` (feed, create, like, comments)
+- **Chat:** `/api/chat/*` + WebSocket
+
+## 🔐 Demo Account
+
+```
+Username: testuser
+Password: password123
+```
+
+## 🐛 Troubleshooting
+
+**Lỗi kết nối backend:**
+- Kiểm tra backend đang chạy tại port 8081
+- Android Emulator: Dùng `10.0.2.2` thay vì `localhost`
+
+**Lỗi build:**
+```bash
+flutter clean
+flutter pub get
+flutter run
+```
+
+---
+
+**Author:** AndroidInsta Team | **Updated:** Nov 3, 2025

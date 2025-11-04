@@ -19,6 +19,19 @@ data class PostSummaryDto(
     val mediaFiles: List<MediaFileDto>
 )
 
+data class UserSummaryDto(
+    val id: Long,
+    val username: String,
+    val fullName: String?,
+    val avatarUrl: String?
+)
+
+data class MediaFileDto(
+    val fileUrl: String,
+    val fileType: String,
+    val orderIndex: Int
+)
+
 fun User.toProfileDto(): ProfileDto {
     return ProfileDto(
         id = this.id,
@@ -42,5 +55,14 @@ fun Post.toPostSummaryDto(): PostSummaryDto {
                 orderIndex = it.orderIndex
             )
         }
+    )
+}
+
+fun User.toUserSummaryDto(): UserSummaryDto {
+    return UserSummaryDto(
+        id = this.id,
+        username = this.username,
+        fullName = this.fullName,
+        avatarUrl = this.avatarUrl
     )
 }

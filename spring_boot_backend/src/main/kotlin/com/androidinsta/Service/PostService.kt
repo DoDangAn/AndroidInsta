@@ -17,7 +17,9 @@ class PostService(
     private val postRepository: PostRepository,
     private val userRepository: UserRepository,
     private val kafkaProducerService: KafkaProducerService,
-    private val redisService: RedisService
+    private val redisService: RedisService,
+    private val notificationService: NotificationService,
+    private val friendService: FriendService
 ) {
     
     /**
@@ -86,6 +88,18 @@ class PostService(
             userId = userId,
             content = caption
         )
+        
+        // Gửi notification cho tất cả bạn bè
+        val friendIds = friendService.getFriendIds(userId)
+        friendIds.forEach { friendId ->
+            notificationService.sendNotification(
+                receiverId = friendId,
+                senderId = userId,
+                type = com.androidinsta.Model.NotificationType.POST,
+                entityId = savedPost.id,
+                message = "${user.username} đã đăng bài viết mới"
+            )
+        }
         
         // Invalidate user cache
         redisService.invalidateUserCache(userId)

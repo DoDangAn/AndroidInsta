@@ -4,7 +4,15 @@ import jakarta.persistence.*
 import java.time.LocalDateTime
 
 enum class NotificationType {
-    LIKE, COMMENT, FOLLOW, MESSAGE
+    LIKE,           // Ai đó thích bài viết/reel của bạn
+    COMMENT,        // Ai đó comment vào bài viết của bạn
+    FOLLOW,         // Ai đó follow bạn
+    MESSAGE,        // Ai đó gửi tin nhắn cho bạn
+    POST,           // Bạn bè đăng bài viết mới
+    REPLY,          // Ai đó trả lời comment của bạn
+    MENTION,        // Ai đó mention bạn
+    FRIEND_REQUEST, // Ai đó gửi lời mời kết bạn
+    FRIEND_ACCEPT   // Ai đó chấp nhận lời mời kết bạn của bạn
 }
 
 @Entity
@@ -29,8 +37,11 @@ data class Notification(
     @Column(name = "entity_id")
     val entityId: Long? = null,
 
+    @Column(columnDefinition = "TEXT")
+    val message: String? = null,
+
     @Column(name = "is_read", nullable = false)
-    val isRead: Boolean = false,
+    var isRead: Boolean = false,
 
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()

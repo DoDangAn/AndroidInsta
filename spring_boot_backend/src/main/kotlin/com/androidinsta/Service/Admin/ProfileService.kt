@@ -1,6 +1,6 @@
 package com.androidinsta.Service.Admin
 
-import com.androidinsta.Repository.UserRepository
+import com.androidinsta.Repository.User.UserRepository
 import com.androidinsta.dto.ProfileDto
 import com.androidinsta.dto.toProfileDto
 import org.springframework.stereotype.Service

@@ -2,9 +2,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import '../config/api_config.dart';
+import '../models/chat_models.dart';
 
 class ChatService {
-  final String baseUrl = 'http://10.0.2.2:8081';
+  final String baseUrl = ApiConfig.baseUrl;
   
   /// Lấy danh sách conversations
   Future<List<Conversation>> getConversations() async {
@@ -101,111 +103,5 @@ class ChatService {
   WebSocketChannel connectWebSocket(String token) {
     const wsUrl = 'ws://10.0.2.2:8081/ws';
     return WebSocketChannel.connect(Uri.parse(wsUrl));
-  }
-}
-
-// Models
-class Conversation {
-  final UserSummary user;
-  final ChatMessage? lastMessage;
-  final int unreadCount;
-  
-  Conversation({
-    required this.user,
-    this.lastMessage,
-    required this.unreadCount,
-  });
-  
-  factory Conversation.fromJson(Map<String, dynamic> json) {
-    return Conversation(
-      user: UserSummary.fromJson(json['user']),
-      lastMessage: json['lastMessage'] != null 
-          ? ChatMessage.fromJson(json['lastMessage'])
-          : null,
-      unreadCount: json['unreadCount'] ?? 0,
-    );
-  }
-}
-
-class ChatMessage {
-  final int id;
-  final String? content;
-  final String? mediaUrl;
-  final String messageType;
-  final UserSummary sender;
-  final UserSummary receiver;
-  final bool isRead;
-  final String createdAt;
-  
-  ChatMessage({
-    required this.id,
-    this.content,
-    this.mediaUrl,
-    required this.messageType,
-    required this.sender,
-    required this.receiver,
-    required this.isRead,
-    required this.createdAt,
-  });
-  
-  factory ChatMessage.fromJson(Map<String, dynamic> json) {
-    return ChatMessage(
-      id: json['id'],
-      content: json['content'],
-      mediaUrl: json['mediaUrl'],
-      messageType: json['messageType'],
-      sender: UserSummary.fromJson(json['sender']),
-      receiver: UserSummary.fromJson(json['receiver']),
-      isRead: json['isRead'],
-      createdAt: json['createdAt'],
-    );
-  }
-}
-
-class UserSummary {
-  final int id;
-  final String username;
-  final String? fullName;
-  final String? avatarUrl;
-  
-  UserSummary({
-    required this.id,
-    required this.username,
-    this.fullName,
-    this.avatarUrl,
-  });
-  
-  factory UserSummary.fromJson(Map<String, dynamic> json) {
-    return UserSummary(
-      id: json['id'],
-      username: json['username'],
-      fullName: json['fullName'],
-      avatarUrl: json['avatarUrl'],
-    );
-  }
-}
-
-class ChatHistory {
-  final List<ChatMessage> messages;
-  final int currentPage;
-  final int totalPages;
-  final int totalItems;
-  
-  ChatHistory({
-    required this.messages,
-    required this.currentPage,
-    required this.totalPages,
-    required this.totalItems,
-  });
-  
-  factory ChatHistory.fromJson(Map<String, dynamic> json) {
-    return ChatHistory(
-      messages: (json['messages'] as List)
-          .map((m) => ChatMessage.fromJson(m))
-          .toList(),
-      currentPage: json['currentPage'],
-      totalPages: json['totalPages'],
-      totalItems: json['totalItems'],
-    );
   }
 }

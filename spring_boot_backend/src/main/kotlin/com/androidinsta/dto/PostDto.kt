@@ -20,25 +20,6 @@ data class PostDto(
 )
 
 /**
- * DTO tóm tắt thông tin User (dùng trong Post)
- */
-data class UserSummaryDto(
-    val id: Long,
-    val username: String,
-    val fullName: String?,
-    val avatarUrl: String?
-)
-
-/**
- * DTO cho Media File
- */
-data class MediaFileDto(
-    val fileUrl: String,
-    val fileType: String,
-    val orderIndex: Int
-)
-
-/**
  * Request DTO để tạo Post mới
  */
 data class CreatePostRequest(

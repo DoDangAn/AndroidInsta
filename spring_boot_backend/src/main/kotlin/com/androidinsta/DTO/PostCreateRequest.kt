@@ -1,6 +1,6 @@
-package com.androidinsta.DTO
+package com.androidinsta.dto
 
-import com.androidinsta.model.Visibility
+import com.androidinsta.Model.Visibility
 
 data class PostCreateRequest(
     val userId: Long,            // đây là trường bắt buộc
