@@ -2,6 +2,28 @@
 
 🚀 **Dự án Instagram clone hoàn chỉnh với authentication JWT và REST API**
 
+---
+
+## 💡 MỞ CẢ FRONTEND VÀ BACKEND CÙNG LÚC
+
+**👉 Sử dụng VS Code Workspace để làm việc hiệu quả nhất:**
+
+```bash
+# Mở workspace trong VS Code
+code AndroidInsta.code-workspace
+```
+
+📖 **Xem hướng dẫn:** [GETTING_STARTED.md](GETTING_STARTED.md) | [WORKSPACE_GUIDE.md](WORKSPACE_GUIDE.md)
+
+**Workspace cho phép bạn:**
+- ✅ Mở cả Flutter và Spring Boot trong một cửa sổ
+- ✅ Tìm kiếm code trong cả FE và BE
+- ✅ Debug đồng thời frontend và backend
+- ✅ Chạy tasks và commands dễ dàng
+- ✅ Sync settings và extensions cho toàn team
+
+---
+
 ## ✨ Tính năng đã triển khai
 
 ### 🔐 **Authentication System:**
@@ -78,29 +100,6 @@ AndroidInsta/
 ### Cho Spring Boot:
 - Java 17 hoặc cao hơn
 - Gradle (hoặc sử dụng Gradle Wrapper có sẵn)
-
-## 🚀 Quick Start - Mở cả Frontend và Backend cùng lúc
-
-**Cách tốt nhất để làm việc với project này là sử dụng VS Code Workspace:**
-
-### Mở Workspace (Khuyến nghị)
-```bash
-# Mở workspace để làm việc với cả FE và BE cùng lúc
-code AndroidInsta.code-workspace
-```
-
-Hoặc trong VS Code: `File` → `Open Workspace from File...` → chọn `AndroidInsta.code-workspace`
-
-📖 **Xem hướng dẫn chi tiết:** [WORKSPACE_GUIDE.md](WORKSPACE_GUIDE.md)
-
-Workspace này cung cấp:
-- ✅ Mở cả Flutter và Spring Boot cùng lúc trong một cửa sổ
-- ✅ Tìm kiếm code trong cả FE và BE
-- ✅ Debug đồng thời frontend và backend
-- ✅ Tasks để build và run dễ dàng
-- ✅ Extensions được đề xuất tự động
-
----
 
 ## Cài đặt và chạy
 
