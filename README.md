@@ -2,6 +2,33 @@
 
 🚀 **Dự án Instagram clone hoàn chỉnh với authentication JWT và REST API**
 
+---
+
+## 💡 MỞ CẢ FRONTEND VÀ BACKEND CÙNG LÚC
+
+**👉 Sử dụng VS Code Workspace để làm việc hiệu quả nhất:**
+
+```bash
+# Mở workspace trong VS Code
+code AndroidInsta.code-workspace
+```
+
+📖 **Hướng dẫn:**
+- 🚀 [Getting Started](GETTING_STARTED.md) - Bắt đầu trong 5 phút
+- 📚 [Full Guide](WORKSPACE_GUIDE.md) - Hướng dẫn đầy đủ
+- 🎯 [Quick Reference](WORKSPACE_QUICKREF.md) - Phím tắt & commands
+- 📸 [Visual Preview](WORKSPACE_VISUAL.md) - Xem giao diện
+- 📋 [Documentation Index](WORKSPACE_INDEX.md) - Tổng hợp tài liệu
+
+**Workspace cho phép bạn:**
+- ✅ Mở cả Flutter và Spring Boot trong một cửa sổ
+- ✅ Tìm kiếm code trong cả FE và BE
+- ✅ Debug đồng thời frontend và backend
+- ✅ Chạy tasks và commands dễ dàng
+- ✅ Sync settings và extensions cho toàn team
+
+---
+
 ## ✨ Tính năng đã triển khai
 
 ### 🔐 **Authentication System:**

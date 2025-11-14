@@ -14,11 +14,15 @@ flutter_app/.metadata
 flutter_app/pubspec.lock
 
 # IDE
-.vscode/
 .idea/
 *.iml
 *.ipr
 *.iws
+
+# VS Code - allow workspace settings but exclude local preferences
+.vscode/settings.local.json
+.vscode/launch.local.json
+.vscode/*.log
 
 # OS generated files
 .DS_Store
