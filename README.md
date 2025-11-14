@@ -13,7 +13,12 @@
 code AndroidInsta.code-workspace
 ```
 
-📖 **Xem hướng dẫn:** [GETTING_STARTED.md](GETTING_STARTED.md) | [WORKSPACE_GUIDE.md](WORKSPACE_GUIDE.md)
+📖 **Hướng dẫn:**
+- 🚀 [Getting Started](GETTING_STARTED.md) - Bắt đầu trong 5 phút
+- 📚 [Full Guide](WORKSPACE_GUIDE.md) - Hướng dẫn đầy đủ
+- 🎯 [Quick Reference](WORKSPACE_QUICKREF.md) - Phím tắt & commands
+- 📸 [Visual Preview](WORKSPACE_VISUAL.md) - Xem giao diện
+- 📋 [Documentation Index](WORKSPACE_INDEX.md) - Tổng hợp tài liệu
 
 **Workspace cho phép bạn:**
 - ✅ Mở cả Flutter và Spring Boot trong một cửa sổ
