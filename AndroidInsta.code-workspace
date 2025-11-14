@@ -32,7 +32,6 @@
       "**/pubspec.lock": true,
       "**/*.lock": true
     },
-    // Flutter/Dart settings
     "dart.flutterSdkPath": null,
     "dart.lineLength": 120,
     "editor.formatOnSave": true,
@@ -46,7 +45,6 @@
       "editor.tabCompletion": "onlySnippets",
       "editor.wordBasedSuggestions": false
     },
-    // Kotlin/Java settings
     "[kotlin]": {
       "editor.formatOnSave": true,
       "editor.defaultFormatter": "fwcd.kotlin"
@@ -54,11 +52,8 @@
     "[java]": {
       "editor.formatOnSave": true
     },
-    // Git settings
     "git.ignoreLimitWarning": true,
-    // Terminal settings
     "terminal.integrated.cwd": "${workspaceFolder}",
-    // File associations
     "files.associations": {
       "*.dart": "dart",
       "*.kt": "kotlin",
@@ -67,20 +62,16 @@
   },
   "extensions": {
     "recommendations": [
-      // Flutter & Dart
       "dart-code.dart-code",
       "dart-code.flutter",
-      // Kotlin & Java
       "fwcd.kotlin",
       "redhat.java",
       "vscjava.vscode-java-pack",
       "vscjava.vscode-spring-boot-dashboard",
       "vmware.vscode-spring-boot",
-      // General development
       "eamodio.gitlens",
       "esbenp.prettier-vscode",
       "ms-vscode.vscode-typescript-next",
-      // REST API testing
       "humao.rest-client",
       "rangav.vscode-thunder-client"
     ]
