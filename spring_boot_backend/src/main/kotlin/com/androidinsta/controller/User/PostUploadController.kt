@@ -92,23 +92,21 @@ class PostUploadController(
                     "message" to "Post uploaded successfully",
                     "post" to PostResponse(
                         id = saved.id,
-                        userId = saved.user.id,
-                        caption = saved.caption,
-                        visibility = saved.visibility,
-                        likesCount = 0,
-                        commentsCount = 0,
-                        isLiked = false,
-                        createdAt = saved.createdAt,
                         user = PostUserResponse(
                             id = user.id,
-                            username = user.username,
-                            fullName = user.fullName,
-                            avatarUrl = user.avatarUrl
+                            username = user.username
                         ),
+                        caption = saved.caption,
+                        visibility = saved.visibility,
+                        likeCount = 0,
+                        commentCount = 0,
+                        isLiked = false,
+                        createdAt = saved.createdAt,
+                        updatedAt = saved.updatedAt,
                         mediaFiles = mediaFiles.map {
                             PostMediaFile(
                                 fileUrl = it.fileUrl,
-                                fileType = it.fileType,
+                                fileType = it.fileType.name,
                                 orderIndex = it.orderIndex
                             )
                         }
@@ -172,12 +170,11 @@ class PostUploadController(
                     "success" to true,
                     "message" to "Post uploaded successfully",
                     "postId" to saved.id,
-                    "imageUrl" to uploadResult.url,
-                    "width" to uploadResult.width,
-                    "height" to uploadResult.height,
-                    "format" to uploadResult.format,
-                    "size" to uploadResult.size
-                )
+                    "imageUrl" to uploadResult.url
+                ) + uploadResult.width?.let { mapOf("width" to it) }.orEmpty()
+                  + uploadResult.height?.let { mapOf("height" to it) }.orEmpty()
+                  + uploadResult.format?.let { mapOf("format" to it) }.orEmpty()
+                  + uploadResult.size?.let { mapOf("size" to it) }.orEmpty()
             )
         } catch (e: Exception) {
             return ResponseEntity.status(500).body(
@@ -221,9 +218,8 @@ class PostUploadController(
                 mapOf(
                     "success" to true,
                     "message" to "Avatar updated successfully",
-                    "avatarUrl" to uploadResult.url,
-                    "thumbnailUrl" to uploadResult.thumbnailUrl
-                )
+                    "avatarUrl" to uploadResult.url
+                ) + uploadResult.thumbnailUrl?.let { mapOf("thumbnailUrl" to it) }.orEmpty()
             )
         } catch (e: Exception) {
             return ResponseEntity.status(500).body(

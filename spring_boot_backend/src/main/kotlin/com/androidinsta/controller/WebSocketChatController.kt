@@ -34,9 +34,9 @@ class WebSocketChatController(
             ?: throw RuntimeException("User not authenticated")
         
         val messageType = try {
-            MessageType.valueOf(request.messageType.uppercase())
+            MessageType.valueOf(request.messageType.lowercase())
         } catch (e: Exception) {
-            MessageType.TEXT
+            MessageType.text
         }
         
         val message = messageService.sendMessage(

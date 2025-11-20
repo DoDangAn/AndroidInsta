@@ -4,7 +4,7 @@ import jakarta.persistence.*
 import java.time.LocalDateTime
 
 enum class MessageType {
-    TEXT, IMAGE, VIDEO
+    text, image, video
 }
 
 @Entity
@@ -12,6 +12,7 @@ enum class MessageType {
 data class Message(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "BIGINT UNSIGNED")
     val id: Long = 0,
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -29,12 +30,12 @@ data class Message(
     val mediaUrl: String? = null,
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "message_type", nullable = false)
-    val messageType: MessageType = MessageType.TEXT,
+    @Column(name = "message_type", nullable = false, columnDefinition = "ENUM('text', 'image', 'video') DEFAULT 'text'")
+    val messageType: MessageType = MessageType.text,
 
-    @Column(name = "is_read", nullable = false)
+    @Column(name = "is_read", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     val isRead: Boolean = false,
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
 )

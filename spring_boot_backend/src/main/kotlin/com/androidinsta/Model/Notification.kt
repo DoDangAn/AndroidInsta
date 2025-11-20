@@ -4,15 +4,10 @@ import jakarta.persistence.*
 import java.time.LocalDateTime
 
 enum class NotificationType {
-    LIKE,           // Ai đó thích bài viết/reel của bạn
-    COMMENT,        // Ai đó comment vào bài viết của bạn
-    FOLLOW,         // Ai đó follow bạn
-    MESSAGE,        // Ai đó gửi tin nhắn cho bạn
-    POST,           // Bạn bè đăng bài viết mới
-    REPLY,          // Ai đó trả lời comment của bạn
-    MENTION,        // Ai đó mention bạn
-    FRIEND_REQUEST, // Ai đó gửi lời mời kết bạn
-    FRIEND_ACCEPT   // Ai đó chấp nhận lời mời kết bạn của bạn
+    LIKE,       // Ai đó thích bài viết của bạn
+    COMMENT,    // Ai đó comment vào bài viết của bạn
+    FOLLOW,     // Ai đó follow bạn
+    MESSAGE     // Ai đó gửi tin nhắn cho bạn
 }
 
 @Entity
@@ -20,6 +15,7 @@ enum class NotificationType {
 data class Notification(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "BIGINT UNSIGNED")
     val id: Long = 0,
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -31,18 +27,15 @@ data class Notification(
     val receiver: User,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "ENUM('LIKE', 'COMMENT', 'FOLLOW', 'MESSAGE')")
     val type: NotificationType,
 
-    @Column(name = "entity_id")
+    @Column(name = "entity_id", columnDefinition = "BIGINT UNSIGNED")
     val entityId: Long? = null,
 
-    @Column(columnDefinition = "TEXT")
-    val message: String? = null,
-
-    @Column(name = "is_read", nullable = false)
+    @Column(name = "is_read", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     var isRead: Boolean = false,
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
 )

@@ -8,6 +8,7 @@ import java.time.LocalDateTime
 data class User(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "BIGINT UNSIGNED")
     val id: Long = 0,
 
     @Column(nullable = false, unique = true, length = 50)
@@ -28,20 +29,20 @@ data class User(
     @Column(name = "avatar_url", length = 255)
     val avatarUrl: String? = null,
 
-    @Column(name = "is_verified")
+    @Column(name = "is_verified", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     val isVerified: Boolean = false,
 
-    @Column(name = "is_active")
+    @Column(name = "is_active", nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
     val isActive: Boolean = true,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "role_id", nullable = false)
+    @JoinColumn(name = "role_id")
     val role: Role? = null,
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", insertable = false)
     val updatedAt: LocalDateTime? = null,
 
     // Relationships

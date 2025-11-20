@@ -52,13 +52,8 @@ class FriendService(
         )
         val saved = friendRequestRepository.save(friendRequest)
 
-        // Gửi notification
-        notificationService.sendNotification(
-            receiverId = receiverId,
-            senderId = senderId,
-            type = NotificationType.FRIEND_REQUEST,
-            message = "${sender.username} đã gửi lời mời kết bạn"
-        )
+        // Note: Database doesn't support FRIEND_REQUEST notification type
+        // Notification feature can be added later if database schema is updated
 
         return toFriendRequestResponse(saved)
     }
@@ -94,13 +89,8 @@ class FriendService(
         friendshipRepository.save(friendship1)
         friendshipRepository.save(friendship2)
 
-        // Gửi notification
-        notificationService.sendNotification(
-            receiverId = request.sender.id,
-            senderId = userId,
-            type = NotificationType.FRIEND_ACCEPT,
-            message = "${request.receiver.username} đã chấp nhận lời mời kết bạn của bạn"
-        )
+        // Note: Database doesn't support FRIEND_ACCEPT notification type
+        // Notification feature can be added later if database schema is updated
 
         return toFriendRequestResponse(request)
     }

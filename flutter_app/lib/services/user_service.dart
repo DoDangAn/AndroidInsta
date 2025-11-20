@@ -137,4 +137,38 @@ class UserService {
       throw Exception('Failed to load user stats');
     }
   }
+
+  /// Update user profile
+  static Future<UserProfile> updateProfile({
+    String? fullName,
+    String? bio,
+    String? email,
+    String? avatarUrl,
+  }) async {
+    final token = await _getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final body = <String, dynamic>{};
+    if (fullName != null) body['fullName'] = fullName;
+    if (bio != null) body['bio'] = bio;
+    if (email != null) body['email'] = email;
+    if (avatarUrl != null) body['avatarUrl'] = avatarUrl;
+
+    final response = await http.put(
+      Uri.parse('$baseUrl/profile'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return UserProfile.fromJson(data['data']);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Failed to update profile');
+    }
+  }
 }

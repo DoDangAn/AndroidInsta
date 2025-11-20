@@ -89,18 +89,6 @@ class PostService(
             content = caption
         )
         
-        // Gửi notification cho tất cả bạn bè
-        val friendIds = friendService.getFriendIds(userId)
-        friendIds.forEach { friendId ->
-            notificationService.sendNotification(
-                receiverId = friendId,
-                senderId = userId,
-                type = com.androidinsta.Model.NotificationType.POST,
-                entityId = savedPost.id,
-                message = "${user.username} đã đăng bài viết mới"
-            )
-        }
-        
         // Invalidate user cache
         redisService.invalidateUserCache(userId)
         

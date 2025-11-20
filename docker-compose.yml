@@ -32,3 +32,5 @@ services:
       PMA_HOST: mysql
       MYSQL_ROOT_PASSWORD: rootpassword
 
+volumes:
+  mysql_data:

@@ -59,40 +59,8 @@ class CloudinaryService(private val cloudinary: Cloudinary) {
             "resource_type", "video",
             "folder", folder,
             "format", "mp4",
-            
-            // Video optimization
-            "eager", listOf(
-                // Main optimized video
-                ObjectUtils.asMap(
-                    "width", width,
-                    "height", height,
-                    "crop", "limit",
-                    "video_codec", "h264",        // Best compatibility
-                    "audio_codec", "aac",         // Best audio codec
-                    "bit_rate", videoBitrate,     // Control video bitrate
-                    "audio_frequency", 44100,     // Standard audio frequency
-                    "quality", "auto:best",       // Auto optimize quality
-                    "fetch_format", "auto"        // Auto select best format
-                ),
-                // Mobile-friendly version (lower bitrate)
-                ObjectUtils.asMap(
-                    "width", 720,
-                    "height", 720,
-                    "crop", "fill",
-                    "video_codec", "h264",
-                    "bit_rate", "1m",
-                    "quality", "auto:good",
-                    "transformation", "mobile_friendly"
-                )
-            ),
-            
-            // Progressive web streaming
-            "eager_async", false,              // Process immediately
-            "streaming_profile", "hd",         // Enable HLS streaming
-            
-            // Additional optimizations
-            "colors", true,                    // Color optimization
-            "duration", 900.0                  // Max 15 minutes
+            "quality", "auto:best",
+            "transformation", "w_${width},h_${height},c_limit,vc_h264,ac_aac,br_${videoBitrate},q_auto:best"
         )
 
         val result = cloudinary.uploader().upload(file.bytes, uploadParams)
@@ -140,50 +108,13 @@ class CloudinaryService(private val cloudinary: Cloudinary) {
         val uploadParams = ObjectUtils.asMap(
             "resource_type", "image",
             "folder", folder,
-            
-            // Image optimization
-            "eager", listOf(
-                // Main high-quality image
-                ObjectUtils.asMap(
-                    "width", maxWidth,
-                    "height", maxHeight,
-                    "crop", "limit",              // Don't upscale, only limit size
-                    "quality", "auto:best",       // Smart quality (90-100)
-                    "fetch_format", "auto",       // Auto WebP/JPEG selection
-                    "dpr", "auto",                // Device pixel ratio auto
-                    "flags", "progressive"        // Progressive JPEG loading
-                ),
-                // Thumbnail version
-                ObjectUtils.asMap(
-                    "width", 360,
-                    "height", 360,
-                    "crop", "fill",
-                    "gravity", "auto",            // Smart cropping
-                    "quality", "auto:good",
-                    "fetch_format", "auto",
-                    "transformation", "thumbnail"
-                ),
-                // Mobile-optimized version
-                ObjectUtils.asMap(
-                    "width", 640,
-                    "height", 640,
-                    "crop", "limit",
-                    "quality", "auto:eco",        // Smaller file for mobile
-                    "fetch_format", "auto",
-                    "transformation", "mobile"
-                )
-            ),
-            
-            // Processing options
-            "eager_async", false,                     // Process immediately
-            "colors", true,                           // Extract dominant colors
-            "faces", true,                            // Detect faces for smart crop
-            "image_metadata", true,                   // Keep EXIF data
-            "phash", true,                            // Perceptual hash for duplicate detection
-            
-            // Additional enhancements
-            "effect", "sharpen:100",                  // Subtle sharpening
-            "flags", listOf("progressive", "lossy")   // Progressive + smart compression
+            "quality", "auto:best",
+            "fetch_format", "auto",
+            "colors", true,
+            "faces", true,
+            "image_metadata", true,
+            "phash", true,
+            "transformation", "w_${maxWidth},h_${maxHeight},c_limit,q_auto:best,f_auto"
         )
 
         val result = cloudinary.uploader().upload(file.bytes, uploadParams)
@@ -212,34 +143,11 @@ class CloudinaryService(private val cloudinary: Cloudinary) {
         val uploadParams = ObjectUtils.asMap(
             "resource_type", "image",
             "folder", "avatars",
-            
-            "eager", listOf(
-                // Main avatar (500x500 circle)
-                ObjectUtils.asMap(
-                    "width", 500,
-                    "height", 500,
-                    "crop", "fill",
-                    "gravity", "faces",           // Focus on face
-                    "quality", "auto:best",
-                    "fetch_format", "auto",
-                    "radius", "max",              // Make it circular
-                    "effect", "sharpen:100"
-                ),
-                // Thumbnail (150x150)
-                ObjectUtils.asMap(
-                    "width", 150,
-                    "height", 150,
-                    "crop", "fill",
-                    "gravity", "faces",
-                    "quality", "auto:good",
-                    "radius", "max",
-                    "transformation", "avatar_thumb"
-                )
-            ),
-            
-            "eager_async", false,
+            "quality", "auto:best",
+            "fetch_format", "auto",
             "faces", true,
-            "colors", true
+            "colors", true,
+            "transformation", "w_500,h_500,c_fill,g_faces,q_auto:best,r_max,e_sharpen:100"
         )
 
         val result = cloudinary.uploader().upload(file.bytes, uploadParams)
@@ -264,77 +172,8 @@ class CloudinaryService(private val cloudinary: Cloudinary) {
             VideoQuality.LOW -> Pair(360, 640)
         }
         
-        return cloudinary.url()
-            .resourceType("video")
-            .transformation(
-                ObjectUtils.asMap(
-                    "width", width,
-                    "height", height,
-                    "crop", "fill",
-                    "gravity", "auto",              // Smart focus
-                    "start_offset", "auto",         // Auto select best frame
-                    "quality", "auto:best",
-                    "fetch_format", "auto",         // WebP/JPEG auto
-                    "effect", "sharpen:100",        // Sharp thumbnail
-                    "format", "jpg"
-                )
-            )
-            .secure(true)
-            .generate("$publicId.jpg")
-    }
-    
-    /**
-     * Get optimized URL for delivery với responsive sizing
-     */
-    fun getOptimizedImageUrl(
-        publicId: String,
-        width: Int? = null,
-        height: Int? = null,
-        crop: String = "limit"
-    ): String {
-        val transformations = mutableMapOf<String, Any>(
-            "quality" to "auto:best",
-            "fetch_format" to "auto",
-            "dpr" to "auto"
-        )
-        
-        width?.let { transformations["width"] = it }
-        height?.let { transformations["height"] = it }
-        transformations["crop"] = crop
-        
-        return cloudinary.url()
-            .transformation(transformations)
-            .secure(true)
-            .generate(publicId)
-    }
-    
-    /**
-     * Get optimized video URL với adaptive streaming
-     */
-    fun getOptimizedVideoUrl(
-        publicId: String,
-        quality: VideoQuality = VideoQuality.MEDIUM
-    ): String {
-        val (width, bitrate) = when (quality) {
-            VideoQuality.HIGH -> Pair(1920, "5m")
-            VideoQuality.MEDIUM -> Pair(1280, "2.5m")
-            VideoQuality.LOW -> Pair(854, "1m")
-        }
-        
-        return cloudinary.url()
-            .resourceType("video")
-            .transformation(
-                ObjectUtils.asMap(
-                    "width", width,
-                    "crop", "limit",
-                    "video_codec", "h264",
-                    "bit_rate", bitrate,
-                    "quality", "auto:good",
-                    "fetch_format", "auto"
-                )
-            )
-            .secure(true)
-            .generate(publicId)
+        // Build URL with transformation parameters directly in the URL
+        return "https://res.cloudinary.com/${cloudinary.config.cloudName}/video/upload/w_${width},h_${height},c_fill,g_auto,q_auto:best,f_auto,e_sharpen:100/${publicId}.jpg"
     }
 
     fun deleteMedia(publicId: String, isVideo: Boolean = false): Boolean {

@@ -67,8 +67,7 @@ class NotificationService(
                 sender = sender,
                 receiver = receiver,
                 type = event.type,
-                entityId = event.entityId,
-                message = event.message
+                entityId = event.entityId
             )
 
             val saved = notificationRepository.save(notification)
@@ -148,7 +147,7 @@ class NotificationService(
             senderUsername = notification.sender.username,
             senderAvatarUrl = notification.sender.avatarUrl,
             type = notification.type,
-            message = notification.message,
+            message = null, // Database doesn't store message field
             entityId = notification.entityId,
             isRead = notification.isRead,
             createdAt = notification.createdAt

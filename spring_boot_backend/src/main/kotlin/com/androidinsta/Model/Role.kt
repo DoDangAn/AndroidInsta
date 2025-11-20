@@ -8,6 +8,7 @@ import java.time.LocalDateTime
 data class Role(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "SMALLINT UNSIGNED")
     val id: Short = 0,
 
     @Column(nullable = false, unique = true, length = 50)
@@ -16,7 +17,7 @@ data class Role(
     @Column(length = 255)
     val description: String? = null,
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
     // Relationships

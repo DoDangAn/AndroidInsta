@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.web.bind.annotation.*
+import java.time.LocalDateTime
 
 @RestController
 @RequestMapping("/api/users")
@@ -32,6 +33,11 @@ class UserController(
                 id = user.id,
                 username = user.username,
                 email = user.email,
+                fullName = user.fullName,
+                bio = user.bio,
+                avatarUrl = user.avatarUrl,
+                isVerified = user.isVerified,
+                isActive = user.isActive,
                 createdAt = user.createdAt,
                 updatedAt = user.updatedAt
             )
@@ -63,6 +69,11 @@ class UserController(
                 id = user.id,
                 username = user.username,
                 email = user.email,
+                fullName = user.fullName,
+                bio = user.bio,
+                avatarUrl = user.avatarUrl,
+                isVerified = user.isVerified,
+                isActive = user.isActive,
                 createdAt = user.createdAt,
                 updatedAt = user.updatedAt
             )
@@ -183,6 +194,60 @@ class UserController(
                     followService.isFollowing(currentUserId, userId) else false
             )
         ))
+    }
+
+    /**
+     * PUT /api/users/profile - Update current user's profile
+     */
+    @PutMapping("/profile")
+    fun updateProfile(@RequestBody request: UpdateUserRequest): ResponseEntity<*> {
+        return try {
+            val userId = securityUtil.getCurrentUserId()
+                ?: throw RuntimeException("User not authenticated")
+
+            val user = userRepository.findById(userId)
+                .orElseThrow { RuntimeException("User not found") }
+
+            // Create updated user with new values
+            val updatedUser = user.copy(
+                fullName = request.fullName ?: user.fullName,
+                bio = request.bio ?: user.bio,
+                email = request.email ?: user.email,
+                avatarUrl = request.avatarUrl ?: user.avatarUrl,
+                updatedAt = LocalDateTime.now()
+            )
+
+            // Save updated user
+            val savedUser = userRepository.save(updatedUser)
+
+            val userResponse = UserResponse(
+                id = savedUser.id,
+                username = savedUser.username,
+                email = savedUser.email,
+                fullName = savedUser.fullName,
+                bio = savedUser.bio,
+                avatarUrl = savedUser.avatarUrl,
+                isVerified = savedUser.isVerified,
+                isActive = savedUser.isActive,
+                createdAt = savedUser.createdAt,
+                updatedAt = savedUser.updatedAt
+            )
+
+            ResponseEntity.ok(
+                mapOf(
+                    "success" to true,
+                    "message" to "Profile updated successfully",
+                    "data" to userResponse
+                )
+            )
+        } catch (e: Exception) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                mapOf(
+                    "success" to false,
+                    "message" to (e.message ?: "Failed to update profile")
+                )
+            )
+        }
     }
 }
 

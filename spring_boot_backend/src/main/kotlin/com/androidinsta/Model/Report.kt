@@ -12,6 +12,7 @@ enum class ReportStatus {
 data class Report(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "BIGINT UNSIGNED")
     val id: Long = 0,
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -30,9 +31,9 @@ data class Report(
     val reason: String,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "ENUM('PENDING', 'REVIEWED', 'RESOLVED') DEFAULT 'PENDING'")
     val status: ReportStatus = ReportStatus.PENDING,
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
 )

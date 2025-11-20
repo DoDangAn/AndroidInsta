@@ -6,7 +6,7 @@ services:
     image: mysql:8.0
     container_name: androidinsta-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: Anninh@2004
       MYSQL_DATABASE: android_insta
       MYSQL_ROOT_HOST: '%'
     ports:

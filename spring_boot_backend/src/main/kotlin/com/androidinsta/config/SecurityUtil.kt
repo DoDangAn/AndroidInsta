@@ -8,7 +8,17 @@ import org.springframework.stereotype.Component
 object SecurityUtil {
 
     @JvmStatic
-    fun getCurrentUserId(): Long? {
+    fun getCurrentUserId(): Long {
+        val authentication = SecurityContextHolder.getContext().authentication
+        return if (authentication?.isAuthenticated == true && authentication.principal != "anonymousUser") {
+            authentication.principal as? Long ?: throw IllegalStateException("User ID not found in authentication")
+        } else {
+            throw IllegalStateException("User not authenticated")
+        }
+    }
+
+    @JvmStatic
+    fun getCurrentUserIdOrNull(): Long? {
         val authentication = SecurityContextHolder.getContext().authentication
         return if (authentication?.isAuthenticated == true && authentication.principal != "anonymousUser") {
             authentication.principal as? Long

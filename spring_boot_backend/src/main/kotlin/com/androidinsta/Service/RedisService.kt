@@ -61,11 +61,11 @@ class RedisService(
     fun checkRateLimit(identifier: String, maxRequests: Int, windowSeconds: Long): Boolean {
         val key = RATE_LIMIT_PREFIX + identifier
         val current = redisTemplate.opsForValue().increment(key) ?: 1L
-        
+
         if (current == 1L) {
             redisTemplate.expire(key, Duration.ofSeconds(windowSeconds))
         }
-        
+
         return current <= maxRequests
     }
 

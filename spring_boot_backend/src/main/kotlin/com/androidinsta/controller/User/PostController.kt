@@ -13,8 +13,7 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/posts")
 class PostController(
     private val postService: PostService,
-    private val likeService: com.androidinsta.Service.LikeService,
-    private val commentService: com.androidinsta.Service.CommentService
+    private val likeService: com.androidinsta.Service.LikeService
 ) {
     
     /**
@@ -163,64 +162,5 @@ class PostController(
         ))
     }
 
-    /**
-     * POST /api/posts/{postId}/comments - Add comment
-     */
-    @PostMapping("/{postId}/comments")
-    fun addComment(
-        @PathVariable postId: Long,
-        @RequestBody request: Map<String, String>
-    ): ResponseEntity<Map<String, Any>> {
-        val userId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
-
-        val content = request["content"] ?: return ResponseEntity.badRequest().build()
-        val comment = commentService.addComment(userId, postId, content)
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(mapOf(
-            "success" to true,
-            "comment" to mapOf(
-                "id" to comment.id,
-                "content" to comment.content,
-                "userId" to comment.user.id,
-                "username" to comment.user.username,
-                "createdAt" to comment.createdAt
-            )
-        ))
-    }
-
-    /**
-     * GET /api/posts/{postId}/comments - Get post comments
-     */
-    @GetMapping("/{postId}/comments")
-    fun getComments(@PathVariable postId: Long): ResponseEntity<Map<String, Any>> {
-        val comments = commentService.getPostComments(postId)
-        return ResponseEntity.ok(mapOf(
-            "success" to true,
-            "comments" to comments.map { comment ->
-                mapOf(
-                    "id" to comment.id,
-                    "content" to comment.content,
-                    "userId" to comment.user.id,
-                    "username" to comment.user.username,
-                    "createdAt" to comment.createdAt
-                )
-            }
-        ))
-    }
-
-    /**
-     * DELETE /api/posts/comments/{commentId} - Delete comment
-     */
-    @DeleteMapping("/comments/{commentId}")
-    fun deleteComment(@PathVariable commentId: Long): ResponseEntity<Map<String, Any>> {
-        val userId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
-
-        commentService.deleteComment(userId, commentId)
-        return ResponseEntity.ok(mapOf(
-            "success" to true,
-            "message" to "Comment deleted successfully"
-        ))
-    }
+    // Comment endpoints have been moved to CommentController
 }

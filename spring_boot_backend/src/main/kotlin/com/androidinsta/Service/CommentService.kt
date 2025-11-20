@@ -24,7 +24,7 @@ class CommentService(
     private val postRepository: PostRepository,
     private val userRepository: UserRepository,
     private val kafkaProducerService: KafkaProducerService,
-    `private val notificationService: NotificationService,
+    private val notificationService: NotificationService,
     private val friendshipRepository: com.androidinsta.Repository.User.FriendshipRepository
 ) {
 
@@ -64,9 +64,9 @@ class CommentService(
                 notificationService.sendNotification(
                     receiverId = parentComment.user.id,
                     senderId = userId,
-                    type = com.androidinsta.Model.NotificationType.REPLY,
+                    type = com.androidinsta.Model.NotificationType.COMMENT,
                     entityId = postId,
-                    message = "${user.username} đã trả lời bình luận của bạn: \"$content\""
+                    message = null
                 )
             }
         } else {
@@ -77,7 +77,7 @@ class CommentService(
                     senderId = userId,
                     type = com.androidinsta.Model.NotificationType.COMMENT,
                     entityId = postId,
-                    message = "${user.username} đã bình luận về bài viết của bạn: \"$content\""
+                    message = null
                 )
             }
         }

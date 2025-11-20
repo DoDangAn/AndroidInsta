@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/post_models.dart';
@@ -200,6 +202,94 @@ class PostService {
 
     if (response.statusCode != 200) {
       throw Exception('Failed to delete comment');
+    }
+  }
+
+  /// Upload a post with image
+  static Future<Map<String, dynamic>> uploadPost({
+    required String imagePath,
+    String? caption,
+    String visibility = 'PUBLIC',
+    String quality = 'HIGH',
+  }) async {
+    final token = await _getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    try {
+      final uri = Uri.parse('$baseUrl/upload-single');
+      final request = http.MultipartRequest('POST', uri);
+
+      // Add headers
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Add image file with proper content type
+      final imageFile = File(imagePath);
+
+      // Check if file exists
+      if (!await imageFile.exists()) {
+        throw Exception('Image file not found at path: $imagePath');
+      }
+
+      final stream = http.ByteStream(imageFile.openRead());
+      final length = await imageFile.length();
+
+      print('Uploading image: ${imagePath.split('/').last}');
+      print('File size: $length bytes');
+
+      // Determine content type based on file extension
+      String contentType = 'image/jpeg';
+      final extension = imagePath.toLowerCase().split('.').last;
+      if (extension == 'png') {
+        contentType = 'image/png';
+      } else if (extension == 'jpg' || extension == 'jpeg') {
+        contentType = 'image/jpeg';
+      } else if (extension == 'gif') {
+        contentType = 'image/gif';
+      } else if (extension == 'webp') {
+        contentType = 'image/webp';
+      }
+
+      print('Content type: $contentType');
+
+      final multipartFile = http.MultipartFile(
+        'image',
+        stream,
+        length,
+        filename: imagePath.split('/').last,
+        contentType: MediaType.parse(contentType),
+      );
+      request.files.add(multipartFile);
+
+      // Add form fields
+      if (caption != null && caption.isNotEmpty) {
+        request.fields['caption'] = caption;
+      }
+      request.fields['visibility'] = visibility;
+      request.fields['quality'] = quality;
+
+      print('Sending request to: $uri');
+      print('Fields: ${request.fields}');
+
+      // Send request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        try {
+          final errorBody = jsonDecode(response.body);
+          throw Exception(errorBody['message'] ?? 'Failed to upload post');
+        } catch (e) {
+          throw Exception('Failed to upload post: ${response.body}');
+        }
+      }
+    } catch (e) {
+      print('Upload error: $e');
+      rethrow;
     }
   }
 }

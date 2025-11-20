@@ -14,13 +14,19 @@ data class UserResponse(
     val id: Long,
     val username: String,
     val email: String,
+    val fullName: String? = null,
+    val bio: String? = null,
+    val avatarUrl: String? = null,
+    val isVerified: Boolean = false,
+    val isActive: Boolean = true,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime?
 )
 
 // Update DTO
 data class UpdateUserRequest(
-    val username: String?,
+    val fullName: String?,
+    val bio: String?,
     val email: String?,
-    val password: String?
+    val avatarUrl: String?
 )

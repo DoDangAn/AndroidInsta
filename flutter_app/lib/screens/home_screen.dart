@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/login_service.dart';
+import '../services/post_service.dart';
+import '../models/post_models.dart';
 import 'chat_list_screen.dart';
+import 'profile_screen.dart';
+import 'create_post_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -11,9 +16,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
   String _username = '';
   String _email = '';
+  int? _userId;
   bool _isLoading = true;
+  List<PostDto> _posts = [];
 
   @override
   void initState() {
@@ -27,25 +35,36 @@ class _HomeScreenState extends State<HomeScreen> {
       final token = prefs.getString('access_token');
       
       if (token != null) {
-        // Verify token and get user info
         await LoginService.getCurrentUser(token);
         
         setState(() {
           _username = prefs.getString('username') ?? '';
           _email = prefs.getString('email') ?? '';
+          _userId = prefs.getInt('user_id');
           _isLoading = false;
         });
+        
+        _loadPosts();
       } else {
-        // No token, redirect to login
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/login');
         }
       }
     } catch (e) {
-      // Token invalid, redirect to login
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/login');
       }
+    }
+  }
+
+  Future<void> _loadPosts() async {
+    try {
+      final feedResponse = await PostService.getFeed();
+      setState(() {
+        _posts = feedResponse.posts;
+      });
+    } catch (e) {
+      print('Error loading posts: $e');
     }
   }
 
@@ -82,6 +101,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _onBottomNavTap(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -93,13 +118,519 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          _buildFeedPage(),
+          _buildSearchPage(),
+          _buildAddPostPage(),
+          _buildActivityPage(),
+          ProfileScreen(userId: _userId),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onBottomNavTap,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Colors.black,
+        unselectedItemColor: Colors.grey,
+        showSelectedLabels: false,
+        showUnselectedLabels: false,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.search),
+            label: 'Search',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.add_box_outlined),
+            label: 'Add',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite_border),
+            activeIcon: Icon(Icons.favorite),
+            label: 'Activity',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedPage() {
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          floating: true,
+          title: const Text(
+            'Instagram',
+            style: TextStyle(
+              fontFamily: 'Billabong',
+              fontSize: 32,
+              color: Colors.black,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.favorite_border, color: Colors.black),
+              onPressed: () {
+                setState(() {
+                  _selectedIndex = 3;
+                });
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.send_outlined, color: Colors.black),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ChatListScreen()),
+                );
+              },
+            ),
+          ],
+        ),
+        SliverToBoxAdapter(
+          child: _buildStoriesRow(),
+        ),
+        _posts.isEmpty
+            ? SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No posts yet',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: _loadPosts,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Refresh'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildPostCard(_posts[index]),
+                  childCount: _posts.length,
+                ),
+              ),
+      ],
+    );
+  }
+
+  Widget _buildStoriesRow() {
+    return Container(
+      height: 110,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey[300]!, width: 0.5),
+        ),
+      ),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        itemCount: 10,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Column(
+              children: [
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
+                      colors: [
+                        Color(0xFFFBAA47),
+                        Color(0xFFD91A46),
+                        Color(0xFFA60F93),
+                      ],
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(3),
+                        child: CircleAvatar(
+                          backgroundColor: Colors.grey[300],
+                          child: Text(
+                            '${index + 1}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: 70,
+                  child: Text(
+                    index == 0 ? 'Your story' : 'user${index}',
+                    style: const TextStyle(fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPostCard(PostDto post) {
+    return Container(
+      color: Colors.white,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Post header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundImage: post.user.avatarUrl != null
+                      ? NetworkImage(post.user.avatarUrl!)
+                      : null,
+                  backgroundColor: Colors.grey[300],
+                  child: post.user.avatarUrl == null
+                      ? Text(
+                          post.user.username.isNotEmpty 
+                              ? post.user.username[0].toUpperCase() 
+                              : 'U',
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    post.user.username,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      builder: (context) => SafeArea(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ListTile(
+                              leading: const Icon(Icons.link),
+                              title: const Text('Copy link'),
+                              onTap: () => Navigator.pop(context),
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.share),
+                              title: const Text('Share'),
+                              onTap: () => Navigator.pop(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          // Post image
+          if (post.mediaFiles.isNotEmpty && post.mediaFiles[0].fileUrl.isNotEmpty)
+            Image.network(
+              post.mediaFiles[0].fileUrl,
+              width: double.infinity,
+              height: 400,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                height: 400,
+                color: Colors.grey[200],
+                child: const Center(
+                  child: Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
+                ),
+              ),
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  height: 400,
+                  color: Colors.grey[200],
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  ),
+                );
+              },
+            )
+          else
+            Container(
+              height: 400,
+              color: Colors.grey[200],
+              child: const Center(
+                child: Icon(Icons.photo, size: 64, color: Colors.grey),
+              ),
+            ),
+          // Action buttons
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: Icon(
+                    post.isLiked ? Icons.favorite : Icons.favorite_border,
+                    color: post.isLiked ? Colors.red : Colors.black,
+                    size: 28,
+                  ),
+                  onPressed: () async {
+                    try {
+                      await PostService.likePost(post.id);
+                      await _loadPosts();
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    }
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline, size: 26),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Comments coming soon!')),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.send_outlined, size: 26),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Share coming soon!')),
+                    );
+                  },
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.bookmark_border, size: 26),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Save coming soon!')),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          // Likes count
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Text(
+              '${post.likesCount} likes',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          // Caption
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(color: Colors.black, fontSize: 14),
+                children: [
+                  TextSpan(
+                    text: '${post.user.username} ',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  TextSpan(text: post.caption ?? ''),
+                ],
+              ),
+            ),
+          ),
+          // Comments count
+          // Comments count
+          if (post.commentsCount > 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Text(
+                'View all ${post.commentsCount} comments',
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              ),
+            ),
+          // Timestamp
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Text(
+              _formatDateTime(post.createdAt),
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchPage() {
+    return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('AndroidInsta'),
-        backgroundColor: Colors.purple,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Search',
+              prefixIcon: const Icon(Icons.search, color: Colors.grey),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+          ),
+        ),
+      ),
+      body: GridView.builder(
+        padding: const EdgeInsets.all(2),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 2,
+          mainAxisSpacing: 2,
+        ),
+        itemCount: 30,
+        itemBuilder: (context, index) {
+          return Container(
+            color: Colors.grey[300],
+            child: const Center(
+              child: Icon(Icons.image, size: 64, color: Colors.grey),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAddPostPage() {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Create Post',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.add_photo_alternate_outlined,
+              size: 100,
+              color: Colors.grey,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Create new post',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: _pickImageFromGallery,
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Select from Gallery'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _takePhotoWithCamera,
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('Take Photo'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityPage() {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Activity',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.black),
             onPressed: () async {
               final shouldLogout = await showDialog<bool>(
                 context: context,
@@ -113,6 +644,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(context, true),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
                       child: const Text('Logout'),
                     ),
                   ],
@@ -126,179 +658,156 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome card
-            Card(
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.purple,
-                          radius: 30,
-                          child: Text(
-                            _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Welcome back!',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey[800],
-                                ),
-                              ),
-                              Text(
-                                _username,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.purple,
-                                ),
-                              ),
-                              Text(
-                                _email,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+      body: ListView.builder(
+        itemCount: 20,
+        itemBuilder: (context, index) {
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.grey[300],
+              child: Text('${index + 1}'),
             ),
-            const SizedBox(height: 24),
-            
-            // Features grid
-            const Text(
-              'Features',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
+            title: RichText(
+              text: TextSpan(
+                style: const TextStyle(color: Colors.black, fontSize: 14),
                 children: [
-                  _buildFeatureCard(
-                    'Posts',
-                    Icons.photo_library,
-                    Colors.blue,
-                    'Create and view posts',
-                    () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Posts feature coming soon!')),
-                      );
-                    },
+                  TextSpan(
+                    text: 'user${index + 1} ',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  _buildFeatureCard(
-                    'Camera',
-                    Icons.camera_alt,
-                    Colors.green,
-                    'Take photos and videos',
-                    () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Camera feature coming soon!')),
-                      );
-                    },
-                  ),
-                  _buildFeatureCard(
-                    'Messages',
-                    Icons.message,
-                    Colors.orange,
-                    'Chat with friends',
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ChatListScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildFeatureCard(
-                    'Profile',
-                    Icons.person,
-                    Colors.purple,
-                    'View and edit profile',
-                    () {
-                      Navigator.pushNamed(context, '/profile');
-                    },
+                  TextSpan(
+                    text: index % 3 == 0
+                        ? 'liked your post.'
+                        : index % 3 == 1
+                            ? 'commented on your post.'
+                            : 'started following you.',
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+            subtitle: Text(
+              '${index + 1}h ago',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+            trailing: index % 3 != 2
+                ? Container(
+                    width: 44,
+                    height: 44,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.image, color: Colors.grey),
+                  )
+                : ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Follow'),
+                  ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildFeatureCard(String title, IconData icon, Color color, String description, VoidCallback onTap) {
-    return Card(
-      elevation: 4,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 48,
-                color: color,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays > 7) {
+      return '${date.day}/${date.month}/${date.year}';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minutes ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  String _formatDateTime(String dateTimeStr) {
+    try {
+      final date = DateTime.parse(dateTimeStr);
+      return _formatDate(date);
+    } catch (e) {
+      return dateTimeStr;
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+
+      if (image != null && mounted) {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CreatePostScreen(imagePath: image.path),
           ),
-        ),
-      ),
-    );
+        );
+
+        // If post was created successfully, refresh the feed
+        if (result == true) {
+          setState(() {
+            _selectedIndex = 0; // Switch back to home feed
+          });
+          _loadPosts();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error selecting image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _takePhotoWithCamera() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+
+      if (image != null && mounted) {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CreatePostScreen(imagePath: image.path),
+          ),
+        );
+
+        // If post was created successfully, refresh the feed
+        if (result == true) {
+          setState(() {
+            _selectedIndex = 0; // Switch back to home feed
+          });
+          _loadPosts();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error taking photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

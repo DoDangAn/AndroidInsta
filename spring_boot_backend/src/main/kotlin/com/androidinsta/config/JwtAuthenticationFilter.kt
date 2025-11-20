@@ -44,7 +44,12 @@ class JwtAuthenticationFilter(
                         val userId = jwtUtil.getUserIdFromToken(token)
                         val roles = jwtUtil.getRolesFromToken(token)
 
-                        val authorities = roles.map { SimpleGrantedAuthority(it) }
+                        // Spring Security expects roles with ROLE_ prefix
+                        val authorities = roles.map { role ->
+                            val roleUpper = role.uppercase()
+                            val roleWithPrefix = if (roleUpper.startsWith("ROLE_")) roleUpper else "ROLE_$roleUpper"
+                            SimpleGrantedAuthority(roleWithPrefix)
+                        }
 
                         val authentication = UsernamePasswordAuthenticationToken(
                             userId, // principal
@@ -55,7 +60,7 @@ class JwtAuthenticationFilter(
                         authentication.details = WebAuthenticationDetailsSource().buildDetails(request)
                         SecurityContextHolder.getContext().authentication = authentication
                         
-                        logger.debug("Authenticated user: userId=$userId, roles=$roles")
+                        logger.info("Authenticated user: userId=$userId, originalRoles=$roles, authorities=${authorities.map { it.authority }}")
                     }
                 }
             } catch (e: Exception) {

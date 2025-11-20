@@ -17,7 +17,7 @@ data class Like(
     @JoinColumn(name = "post_id")
     val post: Post,
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
 )
 

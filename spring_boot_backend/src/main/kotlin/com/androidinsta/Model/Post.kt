@@ -15,14 +15,14 @@ enum class MediaType {
 
 @Embeddable
 data class MediaFile(
-    @Column(name = "file_url", nullable = false, length = 500)
+    @Column(name = "file_url", nullable = false, length = 255)
     val fileUrl: String,
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "file_type", nullable = false)
+    @Column(name = "file_type", nullable = false, columnDefinition = "ENUM('IMAGE', 'VIDEO') DEFAULT 'IMAGE'")
     val fileType: MediaType = MediaType.IMAGE,
 
-    @Column(name = "order_index", nullable = false)
+    @Column(name = "order_index", nullable = false, columnDefinition = "INT DEFAULT 1")
     val orderIndex: Int = 1,
 
     @Column(name = "cloudinary_public_id", length = 255)
@@ -40,6 +40,7 @@ data class MediaFile(
 class Post(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "BIGINT UNSIGNED")
     val id: Long = 0,
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -50,7 +51,7 @@ class Post(
     val caption: String? = null,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "ENUM('PUBLIC', 'PRIVATE', 'ADVERTISE') DEFAULT 'PUBLIC'")
     val visibility: Visibility = Visibility.PUBLIC,
 
 
@@ -64,7 +65,7 @@ class Post(
     @Column(name = "created_at", nullable = false, updatable = false)
     var createdAt: LocalDateTime? = null,
 
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", insertable = false)
     var updatedAt: LocalDateTime? = null,
 
     @OneToMany(mappedBy = "post", cascade = [CascadeType.ALL], fetch = FetchType.LAZY, orphanRemoval = true)

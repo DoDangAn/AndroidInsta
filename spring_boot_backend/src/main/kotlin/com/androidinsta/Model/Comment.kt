@@ -8,6 +8,7 @@ import java.time.LocalDateTime
 data class Comment(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "BIGINT UNSIGNED")
     val id: Long = 0,
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -25,7 +26,7 @@ data class Comment(
     @JoinColumn(name = "parent_comment_id")
     val parentComment: Comment? = null,
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
     // Relationships
