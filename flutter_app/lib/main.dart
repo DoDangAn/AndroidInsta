@@ -9,7 +9,7 @@ void main() {
   runApp(const AndroidInstaApp());
 }
 class AndroidInstaApp extends StatelessWidget {
-  const AndroidInstaApp({Key? key}) : super(key: key);
+  const AndroidInstaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +33,7 @@ class AndroidInstaApp extends StatelessWidget {
 }
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();

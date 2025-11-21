@@ -8,9 +8,11 @@ import 'chat_list_screen.dart';
 import 'profile_screen.dart';
 import 'create_post_screen.dart';
 import 'post_detail_screen.dart';
+import 'notification_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -125,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildFeedPage(),
           _buildSearchPage(),
           _buildAddPostPage(),
-          _buildActivityPage(),
+          const NotificationScreen(),
           ProfileScreen(userId: _userId),
         ],
       ),
@@ -262,9 +264,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 Container(
                   width: 70,
                   height: 70,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
+                    gradient: LinearGradient(
                       begin: Alignment.topRight,
                       end: Alignment.bottomLeft,
                       colors: [
@@ -301,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(
                   width: 70,
                   child: Text(
-                    index == 0 ? 'Your story' : 'user${index}',
+                    index == 0 ? 'Your story' : 'user$index',
                     style: const TextStyle(fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
@@ -327,28 +329,58 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundImage: post.user.avatarUrl != null
-                      ? NetworkImage(post.user.avatarUrl!)
-                      : null,
-                  backgroundColor: Colors.grey[300],
-                  child: post.user.avatarUrl == null
-                      ? Text(
-                          post.user.username.isNotEmpty 
-                              ? post.user.username[0].toUpperCase() 
-                              : 'U',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                        )
-                      : null,
+                GestureDetector(
+                  onTap: () {
+                    // Don't navigate to own profile from post
+                    if (post.user.id != _userId) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProfileScreen(
+                            userId: post.user.id,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundImage: post.user.avatarUrl != null
+                        ? NetworkImage(post.user.avatarUrl!)
+                        : null,
+                    backgroundColor: Colors.grey[300],
+                    child: post.user.avatarUrl == null
+                        ? Text(
+                            post.user.username.isNotEmpty 
+                                ? post.user.username[0].toUpperCase() 
+                                : 'U',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                          )
+                        : null,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    post.user.username,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                  child: GestureDetector(
+                    onTap: () {
+                      // Don't navigate to own profile from post
+                      if (post.user.id != _userId) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProfileScreen(
+                              userId: post.user.id,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: Text(
+                      post.user.username,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
@@ -592,12 +624,12 @@ class _HomeScreenState extends State<HomeScreen> {
             color: Colors.grey[200],
             borderRadius: BorderRadius.circular(10),
           ),
-          child: TextField(
+          child: const TextField(
             decoration: InputDecoration(
               hintText: 'Search',
-              prefixIcon: const Icon(Icons.search, color: Colors.grey),
+              prefixIcon: Icon(Icons.search, color: Colors.grey),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              contentPadding: EdgeInsets.symmetric(vertical: 10),
             ),
           ),
         ),
@@ -679,96 +711,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildActivityPage() {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Activity',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black),
-            onPressed: () async {
-              final shouldLogout = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Logout'),
-                  content: const Text('Are you sure you want to logout?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      style: TextButton.styleFrom(foregroundColor: Colors.red),
-                      child: const Text('Logout'),
-                    ),
-                  ],
-                ),
-              );
-              
-              if (shouldLogout == true) {
-                _logout();
-              }
-            },
-          ),
-        ],
-      ),
-      body: ListView.builder(
-        itemCount: 20,
-        itemBuilder: (context, index) {
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.grey[300],
-              child: Text('${index + 1}'),
-            ),
-            title: RichText(
-              text: TextSpan(
-                style: const TextStyle(color: Colors.black, fontSize: 14),
-                children: [
-                  TextSpan(
-                    text: 'user${index + 1} ',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  TextSpan(
-                    text: index % 3 == 0
-                        ? 'liked your post.'
-                        : index % 3 == 1
-                            ? 'commented on your post.'
-                            : 'started following you.',
-                  ),
-                ],
-              ),
-            ),
-            subtitle: Text(
-              '${index + 1}h ago',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
-            trailing: index % 3 != 2
-                ? Container(
-                    width: 44,
-                    height: 44,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.image, color: Colors.grey),
-                  )
-                : ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Follow'),
-                  ),
-          );
-        },
-      ),
-    );
-  }
+
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();

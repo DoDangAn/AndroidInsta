@@ -1,139 +1,126 @@
 import 'package:flutter/material.dart';
 import '../models/post_models.dart';
 import '../services/post_service.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import 'profile_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostDto post;
 
-  const PostDetailScreen({Key? key, required this.post}) : super(key: key);
+  const PostDetailScreen({super.key, required this.post});
 
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
 }
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
+  late PostDto _post;
+  bool _isLiked = false;
+  int _likeCount = 0;
   final TextEditingController _commentController = TextEditingController();
   List<Comment> _comments = [];
-  bool _isLoadingComments = false;
-  bool _isPostingComment = false;
-  late PostDto _post;
+  bool _isLoadingComments = true;
 
   @override
   void initState() {
     super.initState();
     _post = widget.post;
+    _isLiked = _post.likedByCurrentUser;
+    _likeCount = _post.likeCount;
     _loadComments();
   }
 
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadComments() async {
-    setState(() {
-      _isLoadingComments = true;
-    });
-
     try {
       final comments = await PostService.getComments(_post.id);
-      setState(() {
-        _comments = comments;
-        _isLoadingComments = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoadingComments = false;
-      });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading comments: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _postComment() async {
-    if (_commentController.text.trim().isEmpty) return;
-
-    setState(() {
-      _isPostingComment = true;
-    });
-
-    try {
-      final comment = await PostService.addComment(
-        _post.id,
-        _commentController.text.trim(),
-      );
-
-      setState(() {
-        _comments.insert(0, comment);
-        _commentController.clear();
-        _isPostingComment = false;
-      });
-
-      if (mounted) {
-        FocusScope.of(context).unfocus();
+        setState(() {
+          _comments = comments;
+          _isLoadingComments = false;
+        });
       }
     } catch (e) {
-      setState(() {
-        _isPostingComment = false;
-      });
+      print('Error loading comments: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error posting comment: $e')),
-        );
+        setState(() {
+          _isLoadingComments = false;
+        });
       }
     }
   }
 
   Future<void> _toggleLike() async {
-    try {
-      if (_post.isLiked) {
-        await PostService.unlikePost(_post.id);
-      } else {
-        await PostService.likePost(_post.id);
-      }
+    setState(() {
+      _isLiked = !_isLiked;
+      _likeCount += _isLiked ? 1 : -1;
+    });
 
-      setState(() {
-        _post = PostDto(
-          id: _post.id,
-          user: _post.user,
-          caption: _post.caption,
-          visibility: _post.visibility,
-          mediaFiles: _post.mediaFiles,
-          likesCount: _post.isLiked ? _post.likesCount - 1 : _post.likesCount + 1,
-          commentsCount: _post.commentsCount,
-          isLiked: !_post.isLiked,
-          createdAt: _post.createdAt,
-        );
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+    try {
+      if (_isLiked) {
+        await PostService.likePost(_post.id);
+      } else {
+        await PostService.unlikePost(_post.id);
       }
+    } catch (e) {
+      // Revert if error
+      setState(() {
+        _isLiked = !_isLiked;
+        _likeCount += _isLiked ? 1 : -1;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     }
   }
 
+  Future<void> _addComment() async {
+    final content = _commentController.text.trim();
+    if (content.isEmpty) return;
 
-  Future<void> _deleteComment(int commentId) async {
+    _commentController.clear();
+    FocusScope.of(context).unfocus();
+
     try {
-      await PostService.deleteComment(_post.id, commentId);
+      final newComment = await PostService.addComment(_post.id, content);
       setState(() {
-        _comments.removeWhere((c) => c.id == commentId);
+        _comments.insert(0, newComment);
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Comment deleted')),
-        );
-      }
     } catch (e) {
-      if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error posting comment: $e')),
+      );
+    }
+  }
+
+  Future<void> _deletePost() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Post'),
+        content: const Text('Are you sure you want to delete this post?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await PostService.deletePost(_post.id);
+        if (!mounted) return;
+        Navigator.pop(context); // Return to profile
+      } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting comment: $e')),
+          SnackBar(content: Text('Error deleting post: $e')),
         );
       }
     }
@@ -150,81 +137,142 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          _post.user.username,
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: const Text(
+          'Post',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w600,
+          ),
         ),
+        actions: [
+          if (_post.isOwner)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: _deletePost,
+            ),
+        ],
       ),
       body: Column(
         children: [
-          // Post content
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Post image
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProfileScreen(
+                                  userId: _post.user.id,
+                                ),
+                              ),
+                            );
+                          },
+                          child: CircleAvatar(
+                            radius: 16,
+                            backgroundImage: _post.userAvatar != null
+                                ? NetworkImage(_post.userAvatar!)
+                                : null,
+                            backgroundColor: Colors.grey[300],
+                            child: _post.userAvatar == null
+                                ? Text(
+                                    _post.username.isNotEmpty ? _post.username[0].toUpperCase() : 'U',
+                                    style: const TextStyle(
+                                        fontSize: 14, fontWeight: FontWeight.bold),
+                                  )
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProfileScreen(
+                                  userId: _post.user.id,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            _post.username,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Image
                   if (_post.mediaFiles.isNotEmpty)
-                    Image.network(
-                      _post.mediaFiles[0].fileUrl,
-                      width: double.infinity,
-                      height: 400,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        height: 400,
-                        color: Colors.grey[200],
-                        child: const Center(
-                          child: Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
+                    AspectRatio(
+                      aspectRatio: 1,
+                      child: Image.network(
+                        _post.mediaFiles[0].fileUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.error),
                         ),
                       ),
                     ),
-
-                  // Action buttons
+                  // Actions
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.all(8.0),
                     child: Row(
                       children: [
                         IconButton(
                           icon: Icon(
-                            _post.isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: _post.isLiked ? Colors.red : Colors.black,
-                            size: 28,
+                            _isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: _isLiked ? Colors.red : Colors.black,
                           ),
                           onPressed: _toggleLike,
                         ),
                         IconButton(
-                          icon: const Icon(Icons.chat_bubble_outline, size: 26),
+                          icon: const Icon(Icons.chat_bubble_outline),
                           onPressed: () {
-                            FocusScope.of(context).requestFocus(FocusNode());
+                            // Focus comment field
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.send_outlined, size: 26),
+                          icon: const Icon(Icons.send_outlined),
+                          onPressed: () {},
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.bookmark_border),
                           onPressed: () {},
                         ),
                       ],
                     ),
                   ),
-
-                  // Likes count
+                  // Likes
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Text(
-                      '${_post.likesCount} likes',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      '$_likeCount likes',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
-
                   // Caption
                   if (_post.caption != null && _post.caption!.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                       child: RichText(
                         text: TextSpan(
-                          style: const TextStyle(color: Colors.black, fontSize: 14),
+                          style: const TextStyle(color: Colors.black),
                           children: [
                             TextSpan(
-                              text: '${_post.user.username} ',
+                              text: '${_post.username} ',
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             TextSpan(text: _post.caption),
@@ -232,27 +280,25 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         ),
                       ),
                     ),
-
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  // Date
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                     child: Text(
-                      'Comments',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      timeago.format(DateTime.parse(_post.createdAt)),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                   ),
-
-                  // Comments list
+                  const Divider(),
+                  // Comments List
                   if (_isLoadingComments)
-                    const Center(child: CircularProgressIndicator())
+                    const Center(child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ))
                   else if (_comments.isEmpty)
                     const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(
-                        child: Text(
-                          'No comments yet',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(child: Text('No comments yet')),
                     )
                   else
                     ListView.builder(
@@ -263,18 +309,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         final comment = _comments[index];
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: Colors.grey[300],
-                            child: Text(
-                              comment.user.username[0].toUpperCase(),
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
+                            radius: 16,
+                            backgroundImage: comment.userAvatar != null
+                                ? NetworkImage(comment.userAvatar!)
+                                : null,
+                            child: comment.userAvatar == null
+                                ? Text(comment.username.isNotEmpty ? comment.username[0].toUpperCase() : 'U')
+                                : null,
                           ),
                           title: RichText(
                             text: TextSpan(
-                              style: const TextStyle(color: Colors.black, fontSize: 14),
+                              style: const TextStyle(color: Colors.black),
                               children: [
                                 TextSpan(
-                                  text: '${comment.user.username} ',
+                                  text: '${comment.username} ',
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 TextSpan(text: comment.content),
@@ -282,31 +330,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             ),
                           ),
                           subtitle: Text(
-                            _formatDateTime(comment.createdAt),
-                            style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.more_vert, size: 20),
-                            onPressed: () {
-                              showModalBottomSheet(
-                                context: context,
-                                builder: (context) => SafeArea(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      ListTile(
-                                        leading: const Icon(Icons.delete, color: Colors.red),
-                                        title: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                        onTap: () {
-                                          Navigator.pop(context);
-                                          _deleteComment(comment.id);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
+                            timeago.format(DateTime.parse(comment.createdAt)),
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                           ),
                         );
                       },
@@ -315,14 +340,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ),
             ),
           ),
-
-          // Comment input
+          // Comment Input
           Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(top: BorderSide(color: Colors.grey[300]!)),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Expanded(
@@ -334,47 +358,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                   ),
                 ),
-                if (_isPostingComment)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  TextButton(
-                    onPressed: _postComment,
-                    child: const Text(
-                      'Post',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
+                TextButton(
+                  onPressed: _addComment,
+                  child: const Text('Post'),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
-  }
-
-  String _formatDateTime(String dateTimeStr) {
-    try {
-      final date = DateTime.parse(dateTimeStr);
-      final now = DateTime.now();
-      final difference = now.difference(date);
-
-      if (difference.inDays > 7) {
-        return '${date.day}/${date.month}/${date.year}';
-      } else if (difference.inDays > 0) {
-        return '${difference.inDays}d ago';
-      } else if (difference.inHours > 0) {
-        return '${difference.inHours}h ago';
-      } else if (difference.inMinutes > 0) {
-        return '${difference.inMinutes}m ago';
-      } else {
-        return 'Just now';
-      }
-    } catch (e) {
-      return dateTimeStr;
-    }
   }
 }

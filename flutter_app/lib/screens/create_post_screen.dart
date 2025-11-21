@@ -5,7 +5,7 @@ import '../services/post_service.dart';
 class CreatePostScreen extends StatefulWidget {
   final String imagePath;
 
-  const CreatePostScreen({Key? key, required this.imagePath}) : super(key: key);
+  const CreatePostScreen({super.key, required this.imagePath});
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();

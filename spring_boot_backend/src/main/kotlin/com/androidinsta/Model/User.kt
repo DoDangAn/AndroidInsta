@@ -1,5 +1,6 @@
 package com.androidinsta.Model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -15,9 +16,11 @@ data class User(
     val username: String,
 
     @Column(nullable = false, unique = true, length = 100)
+    @JsonIgnore
     val email: String,
 
     @Column(nullable = false, length = 255)
+    @JsonIgnore
     val password: String,
 
     @Column(name = "full_name", length = 100)
@@ -37,6 +40,7 @@ data class User(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id")
+    @JsonIgnore
     val role: Role? = null,
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -45,22 +49,28 @@ data class User(
     @Column(name = "updated_at", insertable = false)
     val updatedAt: LocalDateTime? = null,
 
-    // Relationships
+    // Relationships - Ignore when serializing to JSON to avoid infinite recursion
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
+    @JsonIgnore
     val posts: List<Post> = emptyList(),
 
     @OneToMany(mappedBy = "follower", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
+    @JsonIgnore
     val following: List<Follow> = emptyList(),
 
     @OneToMany(mappedBy = "followed", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
+    @JsonIgnore
     val followers: List<Follow> = emptyList(),
 
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
+    @JsonIgnore
     val likes: List<Like> = emptyList(),
 
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
+    @JsonIgnore
     val comments: List<Comment> = emptyList(),
 
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
+    @JsonIgnore
     val savedPosts: List<SavedPost> = emptyList()
 )

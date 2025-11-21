@@ -48,6 +48,13 @@ class PostDto {
     this.updatedAt,
   });
 
+  // Convenience getters for UI compatibility
+  bool get likedByCurrentUser => isLiked;
+  int get likeCount => likesCount;
+  bool get isOwner => false; // TODO: implement proper ownership check
+  String? get userAvatar => user.avatarUrl;
+  String get username => user.username;
+
   factory PostDto.fromJson(Map<String, dynamic> json) {
     return PostDto(
       id: json['id'] ?? 0,
@@ -114,6 +121,9 @@ class Comment {
   final String content;
   final PostUser user;
   final String createdAt;
+
+  String? get userAvatar => user.avatarUrl;
+  String get username => user.username;
 
   Comment({
     required this.id,

@@ -47,7 +47,7 @@ class MessageService(
         
         // Gửi message qua WebSocket đến receiver
         messagingTemplate.convertAndSendToUser(
-            receiver.username,
+            receiver.id.toString(),
             "/queue/messages",
             savedMessage
         )

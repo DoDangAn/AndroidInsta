@@ -133,6 +133,7 @@ class UserController(
      */
     @PostMapping("/{userId}/follow")
     fun followUser(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
+// duplicate block removed
         val currentUserId = SecurityUtil.getCurrentUserId()
             ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf(
                 "success" to false,
@@ -177,23 +178,55 @@ class UserController(
             ))
         }
     }
+    @GetMapping("/{userId}/followers")
+    fun getFollowers(@PathVariable userId: Long): ResponseEntity<*> {
+        return try {
+            val followers = followService.getFollowers(userId)
+            val response = followers.map { user ->
+                UserResponse(
+                    id = user.id,
+                    username = user.username,
+                    email = user.email,
+                    fullName = user.fullName,
+                    bio = user.bio,
+                    avatarUrl = user.avatarUrl,
+                    isVerified = user.isVerified,
+                    isActive = user.isActive,
+                    createdAt = user.createdAt,
+                    updatedAt = user.updatedAt
+                )
+            }
+            ResponseEntity.ok(mapOf("success" to true, "data" to response))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf("success" to false, "message" to e.message))
+        }
+    }
 
     /**
-     * GET /api/users/{userId}/stats - Get user stats
+     * GET /api/users/{userId}/following - Get following list
      */
-    @GetMapping("/{userId}/stats")
-    fun getUserStats(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
-        val currentUserId = SecurityUtil.getCurrentUserId()
-
-        return ResponseEntity.ok(mapOf(
-            "success" to true,
-            "stats" to mapOf(
-                "followersCount" to followService.getFollowersCount(userId),
-                "followingCount" to followService.getFollowingCount(userId),
-                "isFollowing" to if (currentUserId != null) 
-                    followService.isFollowing(currentUserId, userId) else false
-            )
-        ))
+    @GetMapping("/{userId}/following")
+    fun getFollowing(@PathVariable userId: Long): ResponseEntity<*> {
+        return try {
+            val following = followService.getFollowing(userId)
+            val response = following.map { user ->
+                UserResponse(
+                    id = user.id,
+                    username = user.username,
+                    email = user.email,
+                    fullName = user.fullName,
+                    bio = user.bio,
+                    avatarUrl = user.avatarUrl,
+                    isVerified = user.isVerified,
+                    isActive = user.isActive,
+                    createdAt = user.createdAt,
+                    updatedAt = user.updatedAt
+                )
+            }
+            ResponseEntity.ok(mapOf("success" to true, "data" to response))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf("success" to false, "message" to e.message))
+        }
     }
 
     /**
@@ -250,12 +283,3 @@ class UserController(
         }
     }
 }
-
-// Extension function để convert User sang UserResponse
-private fun User.toResponse() = UserResponse(
-    id = this.id,
-    username = this.username,
-    email = this.email,
-    createdAt = this.createdAt,
-    updatedAt = this.updatedAt
-)

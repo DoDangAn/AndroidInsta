@@ -72,6 +72,8 @@ interface MessageRepository : JpaRepository<Message, Long> {
     /**
      * Đánh dấu tất cả tin nhắn từ sender là đã đọc
      */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
     @Query("""
         UPDATE Message m 
         SET m.isRead = true

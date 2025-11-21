@@ -66,15 +66,26 @@ class ChatMessage {
   });
   
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    // Handle createdAt - can be String or DateTime object
+    String createdAtStr;
+    if (json['createdAt'] is String) {
+      createdAtStr = json['createdAt'];
+    } else if (json['createdAt'] != null) {
+      // If it's a DateTime object, convert to ISO string
+      createdAtStr = json['createdAt'].toString();
+    } else {
+      createdAtStr = DateTime.now().toIso8601String();
+    }
+    
     return ChatMessage(
-      id: json['id'],
+      id: json['id'] ?? 0,
       content: json['content'],
       mediaUrl: json['mediaUrl'],
-      messageType: json['messageType'],
-      sender: UserSummary.fromJson(json['sender']),
-      receiver: UserSummary.fromJson(json['receiver']),
-      isRead: json['isRead'],
-      createdAt: json['createdAt'],
+      messageType: json['messageType'] ?? 'TEXT',
+      sender: UserSummary.fromJson(json['sender'] ?? {}),
+      receiver: UserSummary.fromJson(json['receiver'] ?? {}),
+      isRead: json['isRead'] ?? false,
+      createdAt: createdAtStr,
     );
   }
 }
@@ -103,3 +114,4 @@ class ChatHistory {
     );
   }
 }
+

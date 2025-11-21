@@ -22,3 +22,5 @@ class WebSocketConfig : WebSocketMessageBrokerConfigurer {
         registry.setUserDestinationPrefix("/user")
     }
 }
+
+

@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
-import 'dart:convert';
-import '../services/chat_service.dart';
+import 'package:stomp_dart_client/stomp_dart_client.dart';
 import '../models/chat_models.dart';
+import '../services/chat_service.dart';
+import '../config/api_config.dart';
 
 class ChatScreen extends StatefulWidget {
   final UserSummary user;
@@ -15,119 +16,128 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final ChatService _chatService = ChatService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ChatService _chatService = ChatService();
   
   List<ChatMessage> _messages = [];
   bool _isLoading = true;
   String? _error;
-  WebSocketChannel? _channel;
-  String? _jwtToken;
   String? _currentUsername;
+  int? _currentUserId;
+  StompClient? _stompClient;
 
   @override
   void initState() {
     super.initState();
-    _initializeChat();
+    _loadCurrentUser();
+    _loadMessages();
+    _connectWebSocket();
   }
 
-  Future<void> _initializeChat() async {
-    await _loadToken();
-    await _loadMessages();
-    await _connectWebSocket();
-    await _markAsRead();
-  }
-
-  Future<void> _loadToken() async {
+  Future<void> _loadCurrentUser() async {
     final prefs = await SharedPreferences.getInstance();
-    _jwtToken = prefs.getString('access_token');
-    _currentUsername = prefs.getString('username');
+    setState(() {
+      _currentUsername = prefs.getString('username');
+      _currentUserId = prefs.getInt('user_id');
+    });
   }
 
   Future<void> _loadMessages() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
     try {
-      final chatHistory = await _chatService.getChatHistory(widget.user.id);
       setState(() {
-        _messages = chatHistory.messages.reversed.toList(); // Reverse for chronological order
-        _isLoading = false;
+        _isLoading = true;
+        _error = null;
       });
+
+      final history = await _chatService.getChatHistory(widget.user.id);
       
-      // Scroll to bottom
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _messages = history.messages.reversed.toList(); // Show oldest first (top) to newest (bottom)
+          _isLoading = false;
+        });
+        
+        // Mark messages as read
+        _markAsRead();
+        
+        // Scroll to bottom after loading
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  Future<void> _connectWebSocket() async {
-    if (_jwtToken == null) return;
+  void _connectWebSocket() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    
+    if (token == null) return;
 
-    try {
-      final wsUrl = 'ws://10.0.2.2:8081/ws?token=$_jwtToken';
-      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
-      
-      // Listen for incoming messages
-      _channel!.stream.listen(
-        (message) {
-          try {
-            final messageData = json.decode(message);
-            final chatMessage = ChatMessage.fromJson(messageData);
-            
-            // Only add if it's from the current chat partner
-            if (chatMessage.sender.id == widget.user.id) {
-              setState(() {
-                _messages.add(chatMessage);
-              });
-              
-              // Mark as read automatically
-              _markAsRead();
-              
-              // Scroll to bottom
-              _scrollToBottom();
-            }
-          } catch (e) {
-            print('Error parsing message: $e');
-          }
+    // Use 10.0.2.2 for Android emulator, localhost for iOS simulator
+    // Adjust port if needed (8081 based on your backend)
+    const wsUrl = 'ws://10.0.2.2:8081/ws/websocket';
+
+    _stompClient = StompClient(
+      config: StompConfig(
+        url: wsUrl,
+        onConnect: (frame) {
+          print('Connected to WebSocket');
+          _stompClient?.subscribe(
+            destination: '/user/queue/messages',
+            callback: (frame) {
+              if (frame.body != null) {
+                try {
+                  final data = json.decode(frame.body!);
+                  final message = ChatMessage.fromJson(data);
+                  
+                  // Only add message if it belongs to this conversation
+                  if (message.sender.id == widget.user.id || 
+                      message.receiver.id == widget.user.id) {
+                    if (mounted) {
+                      setState(() {
+                        _messages.add(message);
+                      });
+                      _scrollToBottom();
+                      
+                      // Mark as read if it's from the other user
+                      if (message.sender.id == widget.user.id) {
+                        _markAsRead();
+                      }
+                    }
+                  }
+                } catch (e) {
+                  print('Error parsing message: $e');
+                }
+              }
+            },
+          );
         },
-        onError: (error) {
-          print('WebSocket error: $error');
-        },
-        onDone: () {
-          print('WebSocket connection closed');
-        },
-      );
-    } catch (e) {
-      print('Failed to connect WebSocket: $e');
-    }
+        onWebSocketError: (dynamic error) => print('WebSocket Error: $error'),
+        stompConnectHeaders: {'Authorization': 'Bearer $token'},
+        webSocketConnectHeaders: {'Authorization': 'Bearer $token'},
+      ),
+    );
+
+    _stompClient?.activate();
   }
 
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   Future<void> _markAsRead() async {
@@ -155,11 +165,27 @@ class _ChatScreenState extends State<ChatScreen> {
       // Scroll to bottom
       _scrollToBottom();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send message: $e')),
-      );
-      // Restore text if failed
-      _messageController.text = content;
+      if (mounted) {
+        // Extract error message
+        String errorMessage = 'Không thể gửi tin nhắn';
+        if (e.toString().contains('Exception:')) {
+          errorMessage = e.toString().replaceFirst('Exception: ', '');
+        } else {
+          errorMessage = e.toString();
+        }
+        
+        print('Error sending message: $e');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        // Restore text if failed
+        _messageController.text = content;
+      }
     }
   }
 
@@ -167,7 +193,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    _channel?.sink.close();
+    _stompClient?.deactivate();
     super.dispose();
   }
 
@@ -184,7 +210,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   : null,
               child: widget.user.avatarUrl == null
                   ? Text(
-                      widget.user.username[0].toUpperCase(),
+                      widget.user.username.isNotEmpty ? widget.user.username[0].toUpperCase() : '?',
                       style: const TextStyle(fontSize: 16),
                     )
                   : null,

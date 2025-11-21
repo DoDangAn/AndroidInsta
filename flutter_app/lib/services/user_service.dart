@@ -138,6 +138,50 @@ class UserService {
     }
   }
 
+  /// Get followers list
+  static Future<List<UserProfile>> getFollowers(int userId) async {
+    final token = await _getToken();
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/$userId/followers'),
+      headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return (data['data'] as List)
+          .map((u) => UserProfile.fromJson(u))
+          .toList();
+    } else {
+      throw Exception('Failed to load followers');
+    }
+  }
+
+  /// Get following list
+  static Future<List<UserProfile>> getFollowing(int userId) async {
+    final token = await _getToken();
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/$userId/following'),
+      headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return (data['data'] as List)
+          .map((u) => UserProfile.fromJson(u))
+          .toList();
+    } else {
+      throw Exception('Failed to load following');
+    }
+  }
+
   /// Update user profile
   static Future<UserProfile> updateProfile({
     String? fullName,

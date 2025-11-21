@@ -1,6 +1,7 @@
 package com.androidinsta.Model
 
 import com.androidinsta.config.MediaTypeDeserializer
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import jakarta.persistence.*
 import java.time.LocalDateTime
@@ -48,6 +49,7 @@ class Post(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
     val user: User,
 
     @Column(columnDefinition = "TEXT")
@@ -72,12 +74,15 @@ class Post(
     var updatedAt: LocalDateTime? = null,
 
     @OneToMany(mappedBy = "post", cascade = [CascadeType.ALL], fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonIgnore
     val comments: MutableList<Comment> = mutableListOf(),
 
     @OneToMany(mappedBy = "post", cascade = [CascadeType.ALL], fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonIgnore
     val likes: MutableSet<Like> = mutableSetOf(),
 
     @OneToMany(mappedBy = "post", cascade = [CascadeType.ALL], fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonIgnore
     val savedPosts: MutableSet<SavedPost> = mutableSetOf(),
 
     @ManyToMany
@@ -86,6 +91,7 @@ class Post(
         joinColumns = [JoinColumn(name = "post_id")],
         inverseJoinColumns = [JoinColumn(name = "tag_id")]
     )
+    @JsonIgnore
     val tags: MutableSet<Tag> = mutableSetOf()
 ) {
 

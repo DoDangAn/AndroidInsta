@@ -1,5 +1,6 @@
 package com.androidinsta.Model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -22,5 +23,6 @@ data class Role(
 
     // Relationships
     @OneToMany(mappedBy = "role", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
+    @JsonIgnore
     val users: List<User> = emptyList()
 )

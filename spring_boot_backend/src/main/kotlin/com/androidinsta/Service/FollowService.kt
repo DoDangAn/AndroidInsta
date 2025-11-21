@@ -17,6 +17,9 @@ interface FollowRepository : JpaRepository<Follow, Long> {
     
     @org.springframework.data.jpa.repository.Query("SELECT f.followed.id FROM Follow f WHERE f.follower.id = :followerId")
     fun findFollowedUserIds(@org.springframework.data.repository.query.Param("followerId") followerId: Long): List<Long>
+
+    fun findByFollowerId(followerId: Long): List<Follow>
+    fun findByFollowedId(followedId: Long): List<Follow>
 }
 
 @Service
@@ -94,5 +97,13 @@ class FollowService(
 
     fun getFollowersCount(userId: Long): Long {
         return followRepository.countByFollowedId(userId)
+    }
+
+    fun getFollowers(userId: Long): List<com.androidinsta.Model.User> {
+        return followRepository.findByFollowedId(userId).map { it.follower }
+    }
+
+    fun getFollowing(userId: Long): List<com.androidinsta.Model.User> {
+        return followRepository.findByFollowerId(userId).map { it.followed }
     }
 }

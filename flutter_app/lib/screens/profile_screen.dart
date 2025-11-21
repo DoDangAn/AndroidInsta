@@ -4,12 +4,17 @@ import '../services/user_service.dart';
 import '../services/post_service.dart';
 import '../models/user_models.dart';
 import '../models/post_models.dart';
+import '../models/chat_models.dart';
 import 'edit_profile_screen.dart';
+import 'followers_screen.dart';
+import 'settings_screen.dart';
+import 'post_detail_screen.dart';
+import 'chat_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final int? userId;
 
-  const ProfileScreen({Key? key, this.userId}) : super(key: key);
+  const ProfileScreen({super.key, this.userId});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -17,6 +22,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   int? _effectiveUserId;
+  int? _currentUserId;
   String _username = '';
   String _email = '';
   bool _isLoading = true;
@@ -38,12 +44,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
+      // Get current user ID
+      final prefs = await SharedPreferences.getInstance();
+      _currentUserId = prefs.getInt('user_id');
+      _username = prefs.getString('username') ?? '';
+      _email = prefs.getString('email') ?? '';
+
       int? id = widget.userId;
       if (id == null) {
-        final prefs = await SharedPreferences.getInstance();
-        id = prefs.getInt('user_id');
-        _username = prefs.getString('username') ?? '';
-        _email = prefs.getString('email') ?? '';
+        id = _currentUserId;
       }
 
       if (id == null) {
@@ -82,6 +91,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         }
       }
+
 
       try {
         _userStats = await UserService.getUserStats(_effectiveUserId!);
@@ -124,50 +134,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.menu, color: Colors.black),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SettingsScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Error loading profile',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _errorMessage!,
-                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _initUserIdAndLoad,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildProfileHeader(),
-                      const SizedBox(height: 16),
-                      _buildBioSection(),
-                      const SizedBox(height: 16),
-                      _buildActionButtons(),
-                      const Divider(height: 1),
-                      _buildPostGrid(),
-                    ],
-                  ),
-                ),
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              'Error loading profile',
+              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage!,
+              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _initUserIdAndLoad,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      )
+          : SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildProfileHeader(),
+            const SizedBox(height: 16),
+            _buildBioSection(),
+            const SizedBox(height: 16),
+            _buildActionButtons(),
+            const Divider(height: 1),
+            _buildPostGrid(),
+          ],
+        ),
+      ),
     );
   }
 
@@ -192,9 +209,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 backgroundColor: Colors.grey[300],
                 child: _userProfile?.avatarUrl == null
                     ? Text(
-                        username.isNotEmpty ? username[0].toUpperCase() : 'U',
-                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-                      )
+                  username.isNotEmpty ? username[0].toUpperCase() : 'U',
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                )
                     : null,
               ),
               const SizedBox(height: 8),
@@ -213,9 +230,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStatColumn(postsCount.toString(), 'Posts'),
-                _buildStatColumn(followersCount.toString(), 'Followers'),
-                _buildStatColumn(followingCount.toString(), 'Following'),
+                _buildStatColumn(postsCount.toString(), 'Posts', null),
+                _buildStatColumn(followersCount.toString(), 'Followers', () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FollowersScreen(
+                        userId: _effectiveUserId!,
+                        title: 'Followers',
+                        isFollowers: true,
+                      ),
+                    ),
+                  );
+                }),
+                _buildStatColumn(followingCount.toString(), 'Following', () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FollowersScreen(
+                        userId: _effectiveUserId!,
+                        title: 'Following',
+                        isFollowers: false,
+                      ),
+                    ),
+                  );
+                }),
               ],
             ),
           ),
@@ -224,8 +263,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStatColumn(String count, String label) {
-    return Column(
+  Widget _buildStatColumn(String count, String label, VoidCallback? onTap) {
+    final column = Column(
       children: [
         Text(
           count,
@@ -244,6 +283,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ],
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: column,
+        ),
+      );
+    }
+
+    return column;
   }
 
   Widget _buildBioSection() {
@@ -258,13 +310,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (fullName != null)
-            Text(
-              fullName,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
           if (bio != null) ...[
             const SizedBox(height: 4),
             Text(
@@ -279,25 +324,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildActionButtons() {
     // Check if this is the current user's profile
-    final isOwnProfile = widget.userId == null || widget.userId == _effectiveUserId;
+    final isOwnProfile = widget.userId == null || widget.userId == _currentUserId;
 
+    if (isOwnProfile) {
+      // Own profile - show Edit Profile button
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _openEditProfile,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.grey[300]!),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Edit Profile',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Other user's profile - show Follow/Unfollow and Message buttons
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: isOwnProfile ? _openEditProfile : _toggleFollow,
+              onPressed: _toggleFollow,
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Colors.grey[300]!),
+                backgroundColor: (_userStats?.isFollowing ?? false) ? Colors.grey[200] : Colors.blue,
+                foregroundColor: (_userStats?.isFollowing ?? false) ? Colors.black : Colors.white,
+                side: BorderSide(color: (_userStats?.isFollowing ?? false) ? Colors.grey[300]! : Colors.blue),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
               child: Text(
-                isOwnProfile ? 'Edit Profile' : (_userStats?.isFollowing ?? false) ? 'Unfollow' : 'Follow',
+                (_userStats?.isFollowing ?? false) ? 'Following' : 'Follow',
                 style: const TextStyle(
-                  color: Colors.black,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
@@ -305,16 +382,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed: () {},
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.grey[300]!),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _openChat,
+              icon: const Icon(Icons.message, size: 18),
+              label: const Text('Message'),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.grey[300]!),
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
             ),
-            child: const Icon(Icons.person_add_outlined, color: Colors.black, size: 20),
           ),
         ],
       ),
@@ -325,20 +405,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     print('Opening edit profile...');
     print('User profile null? ${_userProfile == null}');
     print('Username: $_username, Email: $_email');
-    
+
     if (_userProfile == null) {
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Unable to load profile data. Please try again.'),
           backgroundColor: Colors.red,
         ),
       );
-      
+
       // Try to reload profile
       await _initUserIdAndLoad();
-      
+
       if (_userProfile == null) {
         if (!mounted) return;
         print('Cannot create profile - missing data');
@@ -424,21 +504,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
       itemCount: _userPosts.length,
       itemBuilder: (context, index) {
         final post = _userPosts[index];
-        return Container(
-          color: Colors.grey[300],
-          child: post.mediaFiles.isNotEmpty
-              ? Image.network(
-                  post.mediaFiles[0].fileUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => const Center(
-                    child: Icon(Icons.image_not_supported, color: Colors.grey),
-                  ),
-                )
-              : const Center(
-                  child: Icon(Icons.image, size: 32, color: Colors.grey),
-                ),
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PostDetailScreen(post: post),
+              ),
+            );
+          },
+          child: Container(
+            color: Colors.grey[300],
+            child: post.mediaFiles.isNotEmpty
+                ? Image.network(
+              post.mediaFiles[0].fileUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => const Center(
+                child: Icon(Icons.image_not_supported, color: Colors.grey),
+              ),
+            )
+                : const Center(
+              child: Icon(Icons.image, size: 32, color: Colors.grey),
+            ),
+          ),
         );
       },
+    );
+  }
+
+  void _openChat() {
+    if (_userProfile == null || _effectiveUserId == null) return;
+
+    final userSummary = UserSummary(
+      id: _effectiveUserId!,
+      username: _userProfile!.username,
+      fullName: _userProfile!.fullName,
+      avatarUrl: _userProfile!.avatarUrl,
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(user: userSummary),
+      ),
     );
   }
 }

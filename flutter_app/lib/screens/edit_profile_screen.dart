@@ -6,7 +6,7 @@ import '../models/user_models.dart';
 class EditProfileScreen extends StatefulWidget {
   final UserProfile userProfile;
 
-  const EditProfileScreen({Key? key, required this.userProfile}) : super(key: key);
+  const EditProfileScreen({super.key, required this.userProfile});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
