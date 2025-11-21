@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/user_service.dart';
 import '../models/user_models.dart';
 
@@ -18,6 +19,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _bioController;
   late TextEditingController _emailController;
   bool _isLoading = false;
+  String? _newAvatarUrl;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -49,6 +52,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         fullName: _fullNameController.text.trim(),
         bio: _bioController.text.trim(),
         email: _emailController.text.trim(),
+        avatarUrl: _newAvatarUrl, // Include new avatar if uploaded
       );
 
       if (!mounted) return;
@@ -83,6 +87,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    try {
+      // Pick image from gallery
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Upload to server
+      final avatarUrl = await UserService.uploadAvatar(image.path);
+
+      setState(() {
+        _newAvatarUrl = avatarUrl;
+        _isLoading = false;
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Avatar uploaded successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error uploading avatar: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -134,11 +186,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   CircleAvatar(
                     radius: 50,
-                    backgroundImage: widget.userProfile.avatarUrl != null
-                        ? NetworkImage(widget.userProfile.avatarUrl!)
+                    backgroundImage: (_newAvatarUrl ?? widget.userProfile.avatarUrl) != null
+                        ? NetworkImage(_newAvatarUrl ?? widget.userProfile.avatarUrl!)
                         : null,
                     backgroundColor: Colors.grey[300],
-                    child: widget.userProfile.avatarUrl == null
+                    child: (_newAvatarUrl ?? widget.userProfile.avatarUrl) == null
                         ? Text(
                             widget.userProfile.username[0].toUpperCase(),
                             style: const TextStyle(
@@ -159,14 +211,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       child: IconButton(
                         icon: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
-                        onPressed: () {
-                          // TODO: Implement image upload
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Image upload coming soon!'),
-                            ),
-                          );
-                        },
+                        onPressed: _isLoading ? null : _pickAndUploadAvatar,
                       ),
                     ),
                   ),
@@ -175,14 +220,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 10),
             TextButton(
-              onPressed: () {
-                // TODO: Implement image upload
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Change photo coming soon!'),
-                  ),
-                );
-              },
+              onPressed: _isLoading ? null : _pickAndUploadAvatar,
               child: const Text(
                 'Change Profile Photo',
                 style: TextStyle(

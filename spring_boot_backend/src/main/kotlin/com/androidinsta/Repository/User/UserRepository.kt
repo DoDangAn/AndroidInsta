@@ -24,7 +24,7 @@ interface UserRepository : JpaRepository<User, Long> {
     // Kiểm tra email đã tồn tại
     fun existsByEmail(email: String): Boolean
     
-    // Query custom
-    @Query("SELECT u FROM User u WHERE u.username LIKE %:keyword% OR u.email LIKE %:keyword%")
+    // Query custom - tìm kiếm theo username, email, hoặc fullName
+    @Query("SELECT u FROM User u WHERE u.username LIKE %:keyword% OR u.email LIKE %:keyword% OR u.fullName LIKE %:keyword%")
     fun searchUsers(keyword: String): List<User>
 }

@@ -3,18 +3,10 @@ package com.androidinsta.Service
 import com.androidinsta.Model.Like
 import com.androidinsta.Repository.User.PostRepository
 import com.androidinsta.Repository.User.UserRepository
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.stereotype.Repository
+import com.androidinsta.Repository.User.LikeRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-@Repository
-interface LikeRepository : JpaRepository<Like, Long> {
-    fun findByPostIdAndUserId(postId: Long, userId: Long): Like?
-    fun existsByPostIdAndUserId(postId: Long, userId: Long): Boolean
-    fun deleteByPostIdAndUserId(postId: Long, userId: Long)
-    fun countByPostId(postId: Long): Long
-}
 
 @Service
 @Transactional

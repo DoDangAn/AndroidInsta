@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/user_models.dart';
@@ -213,6 +214,55 @@ class UserService {
     } else {
       final error = jsonDecode(response.body);
       throw Exception(error['message'] ?? 'Failed to update profile');
+    }
+  }
+
+  /// Upload avatar
+  static Future<String> uploadAvatar(String imagePath) async {
+    final token = await _getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    try {
+      final uri = Uri.parse('${ApiConfig.postsUrl}/upload-avatar');
+      final request = http.MultipartRequest('POST', uri);
+
+      // Add headers
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Determine content type based on file extension
+      String contentType = 'image/jpeg';
+      final extension = imagePath.toLowerCase().split('.').last;
+      if (extension == 'png') {
+        contentType = 'image/png';
+      } else if (extension == 'jpg' || extension == 'jpeg') {
+        contentType = 'image/jpeg';
+      } else if (extension == 'gif') {
+        contentType = 'image/gif';
+      } else if (extension == 'webp') {
+        contentType = 'image/webp';
+      }
+
+      // Add image file with explicit content type
+      final file = await http.MultipartFile.fromPath(
+        'avatar',
+        imagePath,
+        contentType: http_parser.MediaType.parse(contentType),
+      );
+      request.files.add(file);
+
+      // Send request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['avatarUrl'] as String;
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to upload avatar');
+      }
+    } catch (e) {
+      throw Exception('Failed to upload avatar: $e');
     }
   }
 }

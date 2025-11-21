@@ -1,0 +1,720 @@
+import 'package:flutter/material.dart';
+import '../models/search_models.dart';
+import '../services/search_service.dart';
+import 'user_profile_screen.dart';
+import 'post_detail_screen.dart';
+
+class SearchScreen extends StatefulWidget {
+  const SearchScreen({Key? key}) : super(key: key);
+
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen>
+    with SingleTickerProviderStateMixin {
+  final SearchService _searchService = SearchService();
+  final TextEditingController _searchController = TextEditingController();
+
+  late TabController _tabController;
+  String _searchQuery = '';
+  bool _isLoading = false;
+  bool _showSuggestions = false;
+
+  // Search results
+  List<UserSearchResult> _userResults = [];
+  List<PostSearchResult> _postResults = [];
+  List<TagSearchResult> _tagResults = [];
+  List<TagSearchResult> _trendingTags = [];
+
+  // Suggestions
+  SearchSuggestions? _suggestions;
+
+  // Pagination
+  int _currentPage = 0;
+  bool _hasMore = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(_onTabChanged);
+    _loadTrendingTags();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) {
+      setState(() {
+        _currentPage = 0;
+        _hasMore = true;
+      });
+      if (_searchQuery.isNotEmpty) {
+        _performSearch();
+      }
+    }
+  }
+
+  Future<void> _loadTrendingTags() async {
+    try {
+      final response = await _searchService.getTrendingTags();
+      setState(() {
+        _trendingTags = response.content;
+      });
+    } catch (e) {
+      print('Error loading trending tags: $e');
+    }
+  }
+
+  Future<void> _performSearch() async {
+    if (_searchQuery.trim().isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+      _showSuggestions = false;
+    });
+
+    try {
+      final currentTab = _tabController.index;
+
+      switch (currentTab) {
+        case 0: // All
+          final result = await _searchService.searchAll(keyword: _searchQuery);
+          setState(() {
+            _userResults = result.users;
+            _postResults = result.posts;
+            _tagResults = result.tags;
+          });
+          break;
+        case 1: // Users
+          final response = await _searchService.searchUsers(
+            keyword: _searchQuery,
+            page: _currentPage,
+          );
+          setState(() {
+            if (_currentPage == 0) {
+              _userResults = response.content;
+            } else {
+              _userResults.addAll(response.content);
+            }
+            _hasMore = _currentPage < response.totalPages - 1;
+          });
+          break;
+        case 2: // Posts
+          final response = await _searchService.searchPosts(
+            keyword: _searchQuery,
+            page: _currentPage,
+          );
+          setState(() {
+            if (_currentPage == 0) {
+              _postResults = response.content;
+            } else {
+              _postResults.addAll(response.content);
+            }
+            _hasMore = _currentPage < response.totalPages - 1;
+          });
+          break;
+        case 3: // Tags
+          final response = await _searchService.searchTags(
+            keyword: _searchQuery,
+            page: _currentPage,
+          );
+          setState(() {
+            if (_currentPage == 0) {
+              _tagResults = response.content;
+            } else {
+              _tagResults.addAll(response.content);
+            }
+            _hasMore = _currentPage < response.totalPages - 1;
+          });
+          break;
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi tìm kiếm: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadSuggestions(String query) async {
+    if (query.length < 2) {
+      setState(() {
+        _suggestions = null;
+        _showSuggestions = false;
+      });
+      return;
+    }
+
+    try {
+      final suggestions = await _searchService.getSearchSuggestions(query: query);
+      setState(() {
+        _suggestions = suggestions;
+        _showSuggestions = true;
+      });
+    } catch (e) {
+      print('Error loading suggestions: $e');
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() {
+      _searchQuery = value;
+    });
+    _loadSuggestions(value);
+  }
+
+  void _onSearchSubmitted(String value) {
+    setState(() {
+      _searchQuery = value;
+      _currentPage = 0;
+      _hasMore = true;
+    });
+    _performSearch();
+  }
+
+  void _loadMore() {
+    if (!_isLoading && _hasMore) {
+      setState(() {
+        _currentPage++;
+      });
+      _performSearch();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: TextField(
+            controller: _searchController,
+            onChanged: _onSearchChanged,
+            onSubmitted: _onSearchSubmitted,
+            decoration: InputDecoration(
+              hintText: 'Tìm kiếm...',
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              prefixIcon: Icon(Icons.search, color: Colors.grey[600], size: 20),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(Icons.clear, color: Colors.grey[600], size: 20),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _searchQuery = '';
+                          _showSuggestions = false;
+                          _userResults = [];
+                          _postResults = [];
+                          _tagResults = [];
+                        });
+                      },
+                    )
+                  : null,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            ),
+          ),
+        ),
+        bottom: _searchQuery.isNotEmpty && !_showSuggestions
+            ? TabBar(
+                controller: _tabController,
+                labelColor: Colors.black,
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: Colors.black,
+                tabs: const [
+                  Tab(text: 'Tất cả'),
+                  Tab(text: 'Người dùng'),
+                  Tab(text: 'Bài viết'),
+                  Tab(text: 'Tags'),
+                ],
+              )
+            : null,
+      ),
+      body: _showSuggestions
+          ? _buildSuggestions()
+          : _searchQuery.isEmpty
+              ? _buildTrendingSection()
+              : _buildSearchResults(),
+    );
+  }
+
+  Widget _buildSuggestions() {
+    if (_suggestions == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ListView(
+      children: [
+        if (_suggestions!.users.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'Người dùng',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ..._suggestions!.users.map((user) => _buildUserSuggestionItem(user)),
+        ],
+        if (_suggestions!.tags.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'Tags',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ..._suggestions!.tags.map((tag) => _buildTagSuggestionItem(tag)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildUserSuggestionItem(UserSearchResult user) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundImage: user.avatarUrl != null
+            ? NetworkImage(user.avatarUrl!)
+            : null,
+        child: user.avatarUrl == null
+            ? Text(user.username[0].toUpperCase())
+            : null,
+      ),
+      title: Row(
+        children: [
+          Text(user.username),
+          if (user.isVerified) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.verified, color: Colors.blue, size: 16),
+          ],
+        ],
+      ),
+      subtitle: user.fullName != null ? Text(user.fullName!) : null,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UserProfileScreen(userId: user.id),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTagSuggestionItem(TagSearchResult tag) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.tag, color: Colors.grey),
+      ),
+      title: Text('#${tag.name}'),
+      subtitle: Text('${tag.postsCount} bài viết'),
+      onTap: () {
+        _searchController.text = tag.name;
+        _onSearchSubmitted(tag.name);
+      },
+    );
+  }
+
+  Widget _buildTrendingSection() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text(
+          'Trending Tags',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (_trendingTags.isEmpty)
+          const Center(child: CircularProgressIndicator())
+        else
+          ..._trendingTags.map((tag) => _buildTrendingTagItem(tag)),
+      ],
+    );
+  }
+
+  Widget _buildTrendingTagItem(TagSearchResult tag) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.purple, Colors.pink],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.tag, color: Colors.white),
+        ),
+        title: Text(
+          '#${tag.name}',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Text('${tag.postsCount} bài viết'),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () {
+          _searchController.text = tag.name;
+          _onSearchSubmitted(tag.name);
+        },
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_isLoading && _currentPage == 0) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return TabBarView(
+      controller: _tabController,
+      children: [
+        _buildAllResults(),
+        _buildUserResults(),
+        _buildPostResults(),
+        _buildTagResults(),
+      ],
+    );
+  }
+
+  Widget _buildAllResults() {
+    return ListView(
+      children: [
+        if (_userResults.isNotEmpty) ...[
+          _buildSectionHeader('Người dùng', () {
+            _tabController.animateTo(1);
+          }),
+          ..._userResults.take(3).map((user) => _buildUserItem(user)),
+        ],
+        if (_postResults.isNotEmpty) ...[
+          _buildSectionHeader('Bài viết', () {
+            _tabController.animateTo(2);
+          }),
+          _buildPostGrid(_postResults.take(6).toList()),
+        ],
+        if (_tagResults.isNotEmpty) ...[
+          _buildSectionHeader('Tags', () {
+            _tabController.animateTo(3);
+          }),
+          ..._tagResults.take(3).map((tag) => _buildTagItem(tag)),
+        ],
+        if (_userResults.isEmpty && _postResults.isEmpty && _tagResults.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Text('Không tìm thấy kết quả'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(String title, VoidCallback onSeeAll) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextButton(
+            onPressed: onSeeAll,
+            child: const Text('Xem tất cả'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserResults() {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (scrollInfo) {
+        if (scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent) {
+          _loadMore();
+        }
+        return false;
+      },
+      child: ListView.builder(
+        itemCount: _userResults.length + (_isLoading ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _userResults.length) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          return _buildUserItem(_userResults[index]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildUserItem(UserSearchResult user) {
+    return ListTile(
+      leading: CircleAvatar(
+        radius: 25,
+        backgroundImage: user.avatarUrl != null
+            ? NetworkImage(user.avatarUrl!)
+            : null,
+        child: user.avatarUrl == null
+            ? Text(user.username[0].toUpperCase())
+            : null,
+      ),
+      title: Row(
+        children: [
+          Text(
+            user.username,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          if (user.isVerified) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.verified, color: Colors.blue, size: 16),
+          ],
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (user.fullName != null) Text(user.fullName!),
+          Text(
+            '${user.followersCount} người theo dõi',
+            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          ),
+        ],
+      ),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UserProfileScreen(userId: user.id),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPostResults() {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (scrollInfo) {
+        if (scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent) {
+          _loadMore();
+        }
+        return false;
+      },
+      child: _postResults.isEmpty
+          ? const Center(child: Text('Không có bài viết'))
+          : GridView.builder(
+              padding: const EdgeInsets.all(2),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 2,
+                mainAxisSpacing: 2,
+              ),
+              itemCount: _postResults.length + (_isLoading ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == _postResults.length) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                return _buildPostGridItem(_postResults[index]);
+              },
+            ),
+    );
+  }
+
+  Widget _buildPostGrid(List<PostSearchResult> posts) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(2),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
+      ),
+      itemCount: posts.length,
+      itemBuilder: (context, index) => _buildPostGridItem(posts[index]),
+    );
+  }
+
+  Widget _buildPostGridItem(PostSearchResult post) {
+    final mediaFile = post.mediaFiles.isNotEmpty ? post.mediaFiles[0] : null;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PostDetailScreen(postId: post.id),
+          ),
+        );
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (mediaFile != null)
+            Image.network(
+              mediaFile.thumbnailUrl ?? mediaFile.fileUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.image, color: Colors.grey),
+                );
+              },
+            )
+          else
+            Container(
+              color: Colors.grey[300],
+              child: const Icon(Icons.image, color: Colors.grey),
+            ),
+          if (mediaFile?.fileType == 'VIDEO')
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Icon(
+                  Icons.play_arrow,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
+          if (post.mediaFiles.length > 1)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Icon(
+                  Icons.collections,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTagResults() {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (scrollInfo) {
+        if (scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent) {
+          _loadMore();
+        }
+        return false;
+      },
+      child: ListView.builder(
+        itemCount: _tagResults.length + (_isLoading ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _tagResults.length) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          return _buildTagItem(_tagResults[index]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildTagItem(TagSearchResult tag) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue, Colors.purple],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.tag, color: Colors.white),
+        ),
+        title: Text(
+          '#${tag.name}',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Text('${tag.postsCount} bài viết'),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () {
+          // TODO: Navigate to tag posts screen
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Xem bài viết với tag #${tag.name}')),
+          );
+        },
+      ),
+    );
+  }
+}

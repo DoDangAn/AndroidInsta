@@ -1,26 +1,10 @@
 package com.androidinsta.Service
 
 import com.androidinsta.Model.Follow
+import com.androidinsta.Repository.User.FollowRepository
 import com.androidinsta.Repository.User.UserRepository
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.stereotype.Repository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-
-@Repository
-interface FollowRepository : JpaRepository<Follow, Long> {
-    fun findByFollowerIdAndFollowedId(followerId: Long, followedId: Long): Follow?
-    fun existsByFollowerIdAndFollowedId(followerId: Long, followedId: Long): Boolean
-    fun deleteByFollowerIdAndFollowedId(followerId: Long, followedId: Long)
-    fun countByFollowerId(followerId: Long): Long
-    fun countByFollowedId(followedId: Long): Long
-    
-    @org.springframework.data.jpa.repository.Query("SELECT f.followed.id FROM Follow f WHERE f.follower.id = :followerId")
-    fun findFollowedUserIds(@org.springframework.data.repository.query.Param("followerId") followerId: Long): List<Long>
-
-    fun findByFollowerId(followerId: Long): List<Follow>
-    fun findByFollowedId(followedId: Long): List<Follow>
-}
 
 @Service
 @Transactional

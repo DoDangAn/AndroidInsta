@@ -5,34 +5,70 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'profile_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
-  final PostDto post;
+  final PostDto? post;
+  final int? postId;
 
-  const PostDetailScreen({super.key, required this.post});
+  const PostDetailScreen({super.key, this.post, this.postId})
+      : assert(post != null || postId != null, 'Either post or postId must be provided');
 
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
 }
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
-  late PostDto _post;
+  PostDto? _post;
   bool _isLiked = false;
   int _likeCount = 0;
   final TextEditingController _commentController = TextEditingController();
   List<Comment> _comments = [];
   bool _isLoadingComments = true;
+  bool _isLoadingPost = false;
 
   @override
   void initState() {
     super.initState();
-    _post = widget.post;
-    _isLiked = _post.likedByCurrentUser;
-    _likeCount = _post.likeCount;
-    _loadComments();
+    if (widget.post != null) {
+      _post = widget.post;
+      _isLiked = _post!.likedByCurrentUser;
+      _likeCount = _post!.likeCount;
+      _loadComments();
+    } else if (widget.postId != null) {
+      _loadPost();
+    }
+  }
+
+  Future<void> _loadPost() async {
+    setState(() {
+      _isLoadingPost = true;
+    });
+
+    try {
+      final post = await PostService.getPostById(widget.postId!);
+      if (mounted) {
+        setState(() {
+          _post = post;
+          _isLiked = post.likedByCurrentUser;
+          _likeCount = post.likeCount;
+          _isLoadingPost = false;
+        });
+        _loadComments();
+      }
+    } catch (e) {
+      print('Error loading post: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingPost = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading post: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _loadComments() async {
     try {
-      final comments = await PostService.getComments(_post.id);
+      final comments = await PostService.getComments(_post!.id);
       if (mounted) {
         setState(() {
           _comments = comments;
@@ -57,9 +93,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
     try {
       if (_isLiked) {
-        await PostService.likePost(_post.id);
+        await PostService.likePost(_post!.id);
       } else {
-        await PostService.unlikePost(_post.id);
+        await PostService.unlikePost(_post!.id);
       }
     } catch (e) {
       // Revert if error
@@ -81,7 +117,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     FocusScope.of(context).unfocus();
 
     try {
-      final newComment = await PostService.addComment(_post.id, content);
+      final newComment = await PostService.addComment(_post!.id, content);
       setState(() {
         _comments.insert(0, newComment);
       });
@@ -114,7 +150,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
     if (confirmed == true) {
       try {
-        await PostService.deletePost(_post.id);
+        await PostService.deletePost(_post!.id);
         if (!mounted) return;
         Navigator.pop(context); // Return to profile
       } catch (e) {
@@ -128,6 +164,30 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingPost || _post == null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text(
+            'Post',
+            style: TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -145,7 +205,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ),
         ),
         actions: [
-          if (_post.isOwner)
+          if (_post!.isOwner)
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
               onPressed: _deletePost,
@@ -170,20 +230,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => ProfileScreen(
-                                  userId: _post.user.id,
+                                  userId: _post!.user.id,
                                 ),
                               ),
                             );
                           },
                           child: CircleAvatar(
                             radius: 16,
-                            backgroundImage: _post.userAvatar != null
-                                ? NetworkImage(_post.userAvatar!)
+                            backgroundImage: _post!.userAvatar != null
+                                ? NetworkImage(_post!.userAvatar!)
                                 : null,
                             backgroundColor: Colors.grey[300],
-                            child: _post.userAvatar == null
+                            child: _post!.userAvatar == null
                                 ? Text(
-                                    _post.username.isNotEmpty ? _post.username[0].toUpperCase() : 'U',
+                                    _post!.username.isNotEmpty ? _post!.username[0].toUpperCase() : 'U',
                                     style: const TextStyle(
                                         fontSize: 14, fontWeight: FontWeight.bold),
                                   )
@@ -197,13 +257,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => ProfileScreen(
-                                  userId: _post.user.id,
+                                  userId: _post!.user.id,
                                 ),
                               ),
                             );
                           },
                           child: Text(
-                            _post.username,
+                            _post!.username,
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                             ),
@@ -213,11 +273,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                   ),
                   // Image
-                  if (_post.mediaFiles.isNotEmpty)
+                  if (_post!.mediaFiles.isNotEmpty)
                     AspectRatio(
                       aspectRatio: 1,
                       child: Image.network(
-                        _post.mediaFiles[0].fileUrl,
+                        _post!.mediaFiles[0].fileUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: Colors.grey[300],
@@ -264,7 +324,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                   ),
                   // Caption
-                  if (_post.caption != null && _post.caption!.isNotEmpty)
+                  if (_post!.caption != null && _post!.caption!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                       child: RichText(
@@ -272,10 +332,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           style: const TextStyle(color: Colors.black),
                           children: [
                             TextSpan(
-                              text: '${_post.username} ',
+                              text: '${_post!.username} ',
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
-                            TextSpan(text: _post.caption),
+                            TextSpan(text: _post!.caption),
                           ],
                         ),
                       ),
@@ -284,7 +344,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                     child: Text(
-                      timeago.format(DateTime.parse(_post.createdAt)),
+                      timeago.format(DateTime.parse(_post!.createdAt)),
                       style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                   ),

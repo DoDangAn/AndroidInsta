@@ -68,6 +68,25 @@ class PostService {
     }
   }
 
+  /// Get a single post by ID
+  static Future<PostDto> getPostById(int postId) async {
+    final token = await _getToken();
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/$postId'),
+      headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return PostDto.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load post');
+    }
+  }
+
   /// Create a new post
   static Future<PostDto> createPost({
     required String caption,

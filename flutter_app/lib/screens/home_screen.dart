@@ -9,6 +9,7 @@ import 'profile_screen.dart';
 import 'create_post_screen.dart';
 import 'post_detail_screen.dart';
 import 'notification_screen.dart';
+import 'search_screen.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -105,6 +106,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onBottomNavTap(int index) {
+    // Refresh feed when coming back from profile tab
+    if (_selectedIndex == 4 && index == 0) {
+      _loadPosts();
+    }
+    
     setState(() {
       _selectedIndex = index;
     });
@@ -125,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _selectedIndex,
         children: [
           _buildFeedPage(),
-          _buildSearchPage(),
+          const SearchScreen(),
           _buildAddPostPage(),
           const NotificationScreen(),
           ProfileScreen(userId: _userId),
