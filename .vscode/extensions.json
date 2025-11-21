@@ -1,0 +1,19 @@
+{
+  "recommendations": [
+    "dart-code.dart-code",
+    "dart-code.flutter",
+    "fwcd.kotlin",
+    "redhat.java",
+    "vscjava.vscode-java-pack",
+    "vscjava.vscode-spring-boot-dashboard",
+    "vmware.vscode-spring-boot",
+    "vscjava.vscode-gradle",
+    "eamodio.gitlens",
+    "humao.rest-client",
+    "rangav.vscode-thunder-client",
+    "esbenp.prettier-vscode",
+    "usernamehw.errorlens",
+    "ms-vscode.vscode-json",
+    "ms-azuretools.vscode-docker"
+  ]
+}

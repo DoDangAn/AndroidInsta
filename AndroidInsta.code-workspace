@@ -1,0 +1,185 @@
+{
+  "folders": [
+    {
+      "name": "🎨 Flutter Frontend",
+      "path": "flutter_app"
+    },
+    {
+      "name": "⚙️ Spring Boot Backend",
+      "path": "spring_boot_backend"
+    },
+    {
+      "name": "📁 Root",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/.git": true,
+      "**/.DS_Store": true,
+      "**/node_modules": true,
+      "**/.gradle": true,
+      "**/build": true,
+      "**/.dart_tool": true,
+      "**/.flutter-plugins": true,
+      "**/.flutter-plugins-dependencies": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/build": true,
+      "**/.gradle": true,
+      "**/.dart_tool": true,
+      "**/pubspec.lock": true,
+      "**/*.lock": true
+    },
+    "dart.flutterSdkPath": null,
+    "dart.lineLength": 120,
+    "editor.formatOnSave": true,
+    "[dart]": {
+      "editor.formatOnSave": true,
+      "editor.formatOnType": true,
+      "editor.rulers": [120],
+      "editor.selectionHighlight": false,
+      "editor.suggest.snippetsPreventQuickSuggestions": false,
+      "editor.suggestSelection": "first",
+      "editor.tabCompletion": "onlySnippets",
+      "editor.wordBasedSuggestions": false
+    },
+    "[kotlin]": {
+      "editor.formatOnSave": true,
+      "editor.defaultFormatter": "fwcd.kotlin"
+    },
+    "[java]": {
+      "editor.formatOnSave": true
+    },
+    "git.ignoreLimitWarning": true,
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "files.associations": {
+      "*.dart": "dart",
+      "*.kt": "kotlin",
+      "*.kts": "kotlin"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "dart-code.dart-code",
+      "dart-code.flutter",
+      "fwcd.kotlin",
+      "redhat.java",
+      "vscjava.vscode-java-pack",
+      "vscjava.vscode-spring-boot-dashboard",
+      "vmware.vscode-spring-boot",
+      "eamodio.gitlens",
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-typescript-next",
+      "humao.rest-client",
+      "rangav.vscode-thunder-client"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Flutter: Run",
+        "type": "dart",
+        "request": "launch",
+        "program": "flutter_app/lib/main.dart",
+        "cwd": "${workspaceFolder}/flutter_app"
+      },
+      {
+        "name": "Flutter: Debug",
+        "type": "dart",
+        "request": "launch",
+        "program": "flutter_app/lib/main.dart",
+        "cwd": "${workspaceFolder}/flutter_app",
+        "flutterMode": "debug"
+      },
+      {
+        "name": "Spring Boot: Run",
+        "type": "java",
+        "request": "launch",
+        "mainClass": "com.androidinsta.AndroidInstaApplicationKt",
+        "projectName": "spring_boot_backend",
+        "cwd": "${workspaceFolder}/spring_boot_backend"
+      }
+    ],
+    "compounds": [
+      {
+        "name": "Full Stack: FE + BE",
+        "configurations": [
+          "Spring Boot: Run",
+          "Flutter: Run"
+        ],
+        "stopAll": true,
+        "preLaunchTask": null
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Flutter: Get Dependencies",
+        "type": "shell",
+        "command": "flutter pub get",
+        "options": {
+          "cwd": "${workspaceFolder}/flutter_app"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Flutter: Build APK",
+        "type": "shell",
+        "command": "flutter build apk",
+        "options": {
+          "cwd": "${workspaceFolder}/flutter_app"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Spring Boot: Build",
+        "type": "shell",
+        "command": "./gradlew build",
+        "windows": {
+          "command": ".\\gradlew.bat build"
+        },
+        "options": {
+          "cwd": "${workspaceFolder}/spring_boot_backend"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Spring Boot: Run",
+        "type": "shell",
+        "command": "./gradlew bootRun",
+        "windows": {
+          "command": ".\\gradlew.bat bootRun"
+        },
+        "options": {
+          "cwd": "${workspaceFolder}/spring_boot_backend"
+        },
+        "isBackground": true,
+        "problemMatcher": {
+          "pattern": {
+            "regexp": "^.*$",
+            "file": 1,
+            "location": 2,
+            "message": 3
+          },
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": "^.*Starting.*",
+            "endsPattern": "^.*Started.*"
+          }
+        }
+      },
+      {
+        "label": "Start Full Stack",
+        "dependsOn": [
+          "Spring Boot: Run"
+        ],
+        "problemMatcher": []
+      }
+    ]
+  }
+}

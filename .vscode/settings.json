@@ -1,0 +1,71 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.git": true,
+    "**/build": true,
+    "**/.gradle": true,
+    "**/.dart_tool": true
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.gradle/**": true,
+    "**/build/**": true,
+    "**/.dart_tool/**": true
+  },
+  // Format on save
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": false,
+  
+  // Dart/Flutter specific
+  "[dart]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.rulers": [120],
+    "editor.selectionHighlight": false,
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "editor.suggestSelection": "first",
+    "editor.tabCompletion": "onlySnippets",
+    "editor.wordBasedSuggestions": false
+  },
+  "dart.lineLength": 120,
+  
+  // Kotlin/Java specific
+  "[kotlin]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "fwcd.kotlin"
+  },
+  "[java]": {
+    "editor.formatOnSave": true
+  },
+  
+  // Git
+  "git.ignoreLimitWarning": true,
+  "git.autofetch": true,
+  
+  // Terminal
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  
+  // Editor
+  "editor.minimap.enabled": true,
+  "editor.suggestSelection": "first",
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  
+  // Files
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  
+  // Explorer
+  "explorer.confirmDelete": false,
+  "explorer.confirmDragAndDrop": false
+}
