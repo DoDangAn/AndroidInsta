@@ -1,45 +1,97 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import '../models/user_models.dart';
 
-// Demo Login Service cho Flutter App
+class LoginResponse {
+  final bool success;
+  final String message;
+  final AuthData? data;
+
+  LoginResponse({
+    required this.success,
+    required this.message,
+    this.data,
+  });
+
+  factory LoginResponse.fromJson(Map<String, dynamic> json) {
+    return LoginResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      data: json['data'] != null ? AuthData.fromJson(json['data']) : null,
+    );
+  }
+}
+
+class AuthData {
+  final String accessToken;
+  final String refreshToken;
+  final UserProfile user;
+
+  AuthData({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.user,
+  });
+
+  factory AuthData.fromJson(Map<String, dynamic> json) {
+    return AuthData(
+      accessToken: json['accessToken'] ?? '',
+      refreshToken: json['refreshToken'] ?? '',
+      user: UserProfile.fromJson(json['user']),
+    );
+  }
+}
+
 class LoginService {
   static const String baseUrl = ApiConfig.authUrl;
-  
-  // Login method
-  static Future<LoginResponse> login(String usernameOrEmail, String password) async {
+
+  static Future<LoginResponse> login(String username, String password) async {
     try {
+      print('Attempting login for: $username');
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: ApiConfig.headers,
         body: jsonEncode({
-          'usernameOrEmail': usernameOrEmail,
+          'usernameOrEmail': username,
           'password': password,
         }),
       );
-      
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode == 200 && data['success']) {
-        return LoginResponse.fromJson(data);
+
+      print('Login response status: ${response.statusCode}');
+      print('Login response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return LoginResponse.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception(data['message'] ?? 'Login failed');
+        try {
+          final error = jsonDecode(response.body);
+          throw Exception(error['message'] ?? 'Login failed with status ${response.statusCode}');
+        } catch (e) {
+          if (e is FormatException) {
+            throw Exception('Server returned invalid response: ${response.statusCode}');
+          }
+          rethrow;
+        }
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      print('Login error: $e');
+      String message = e.toString().replaceAll('Exception: ', '');
+      throw Exception(message);
     }
   }
-  
-  // Register method
-  static Future<LoginResponse> register(String username, String email, String password, {String? fullName}) async {
+
+  static Future<LoginResponse> register(
+    String username,
+    String email,
+    String password, {
+    String? fullName,
+  }) async {
     try {
+      print('Attempting registration for: $username');
       final response = await http.post(
         Uri.parse('$baseUrl/register'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: ApiConfig.headers,
         body: jsonEncode({
           'username': username,
           'email': email,
@@ -47,130 +99,59 @@ class LoginService {
           'fullName': fullName,
         }),
       );
-      
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode == 201 && data['success']) {
-        return LoginResponse.fromJson(data);
+
+      print('Register response status: ${response.statusCode}');
+      print('Register response body: ${response.body}');
+
+      if (response.statusCode == 201) {
+        return LoginResponse.fromJson(jsonDecode(response.body));
       } else {
-        throw Exception(data['message'] ?? 'Registration failed');
+        try {
+          final error = jsonDecode(response.body);
+          throw Exception(error['message'] ?? 'Registration failed');
+        } catch (e) {
+          if (e is FormatException) {
+            throw Exception('Server returned invalid response: ${response.statusCode}');
+          }
+          rethrow;
+        }
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      print('Registration error: $e');
+      String message = e.toString().replaceAll('Exception: ', '');
+      throw Exception(message);
     }
   }
-  
-  // Get current user
-  static Future<Map<String, dynamic>> getCurrentUser(String token) async {
+
+  static Future<void> getCurrentUser(String token) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/me'),
         headers: {
+          ...ApiConfig.headers,
           'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
         },
       );
-      
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode == 200 && data['success']) {
-        return data;
-      } else {
-        throw Exception(data['message'] ?? 'Failed to get user info');
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load user info');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      throw Exception('Failed to load user info: ${e.toString()}');
     }
   }
-  
-  // Logout
+
   static Future<void> logout(String token) async {
     try {
-      final response = await http.post(
+      await http.post(
         Uri.parse('$baseUrl/logout'),
         headers: {
+          ...ApiConfig.headers,
           'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
         },
       );
-      
-      final data = jsonDecode(response.body);
-      
-      if (response.statusCode != 200 || !data['success']) {
-        throw Exception(data['message'] ?? 'Logout failed');
-      }
     } catch (e) {
-      throw Exception('Network error: $e');
+      // Ignore logout errors
     }
-  }
-}
-
-// Data models
-class LoginResponse {
-  final bool success;
-  final String message;
-  final LoginData? data;
-  
-  LoginResponse({
-    required this.success,
-    required this.message,
-    this.data,
-  });
-  
-  factory LoginResponse.fromJson(Map<String, dynamic> json) {
-    return LoginResponse(
-      success: json['success'] ?? false,
-      message: json['message'] ?? '',
-      data: json['data'] != null ? LoginData.fromJson(json['data']) : null,
-    );
-  }
-}
-
-class LoginData {
-  final String accessToken;
-  final String refreshToken;
-  final String tokenType;
-  final int expiresIn;
-  final UserInfo user;
-  
-  LoginData({
-    required this.accessToken,
-    required this.refreshToken,
-    required this.tokenType,
-    required this.expiresIn,
-    required this.user,
-  });
-  
-  factory LoginData.fromJson(Map<String, dynamic> json) {
-    return LoginData(
-      accessToken: json['accessToken'] ?? '',
-      refreshToken: json['refreshToken'] ?? '',
-      tokenType: json['tokenType'] ?? 'Bearer',
-      expiresIn: json['expiresIn'] ?? 0,
-      user: UserInfo.fromJson(json['user']),
-    );
-  }
-}
-
-class UserInfo {
-  final int id;
-  final String username;
-  final String email;
-  final List<String> roles;
-  
-  UserInfo({
-    required this.id,
-    required this.username,
-    required this.email,
-    required this.roles,
-  });
-  
-  factory UserInfo.fromJson(Map<String, dynamic> json) {
-    return UserInfo(
-      id: json['id'] ?? 0,
-      username: json['username'] ?? '',
-      email: json['email'] ?? '',
-      roles: List<String>.from(json['roles'] ?? []),
-    );
   }
 }

@@ -112,17 +112,13 @@ class MediaFile {
 class Comment {
   final int id;
   final String content;
-  final int userId;
-  final String username;
-  final String? avatarUrl;
+  final PostUser user;
   final String createdAt;
 
   Comment({
     required this.id,
     required this.content,
-    required this.userId,
-    required this.username,
-    this.avatarUrl,
+    required this.user,
     required this.createdAt,
   });
 
@@ -130,9 +126,13 @@ class Comment {
     return Comment(
       id: json['id'] ?? 0,
       content: json['content'] ?? '',
-      userId: json['userId'] ?? 0,
-      username: json['username'] ?? '',
-      avatarUrl: json['avatarUrl'],
+      user: json['user'] != null 
+          ? PostUser.fromJson(json['user'])
+          : PostUser(
+              id: json['userId'] ?? 0,
+              username: json['username'] ?? '',
+              avatarUrl: json['avatarUrl'],
+            ),
       createdAt: json['createdAt'] ?? '',
     );
   }

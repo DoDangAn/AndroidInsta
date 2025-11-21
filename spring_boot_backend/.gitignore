@@ -1,16 +1,11 @@
-# ------------------------------
 # Gradle
-# ------------------------------
 .gradle/
-!gradle/wrapper/gradle-wrapper.jar
-.gradle/buildOutputCleanup/
 build/
+!gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-# ------------------------------
-# Eclipse / STS
-# ------------------------------
+# STS
 .apt_generated
 .classpath
 .factorypath
@@ -22,10 +17,8 @@ bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
-# ------------------------------
 # IntelliJ IDEA
-# ------------------------------
-.idea/
+.idea
 *.iws
 *.iml
 *.ipr
@@ -33,22 +26,65 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
-# ------------------------------
 # NetBeans
-# ------------------------------
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-# ------------------------------
 # VS Code
-# ------------------------------
 .vscode/
 
-# ------------------------------
-# OS Files
-# ------------------------------
+# Mac
 .DS_Store
-Thumbs.db
+
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Logs
+*.log
+logs/
+
+# Application properties (sensitive data)
+application-local.properties
+application-dev.properties
+application-prod.properties
+# Keep example
+!application.properties.example
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Compiled class files
+*.class
+
+# Package Files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+# Kotlin
+*.kotlin_module
+*.kotlin_builtins
+
+# Cloudinary config (if sensitive)
+# cloudinary.properties

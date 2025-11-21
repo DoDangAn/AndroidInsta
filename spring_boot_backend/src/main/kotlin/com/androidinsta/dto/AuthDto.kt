@@ -59,6 +59,7 @@ data class UserInfo(
 data class JwtResponse(
     val accessToken: String,
     val refreshToken: String,
+    val tokenType: String = "Bearer",
     val expiresIn: Long,
     val user: UserInfo
 )

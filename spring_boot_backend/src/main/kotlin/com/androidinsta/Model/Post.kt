@@ -1,5 +1,7 @@
 package com.androidinsta.Model
 
+import com.androidinsta.config.MediaTypeDeserializer
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -9,6 +11,7 @@ enum class Visibility {
     ADVERTISE  // Quảng cáo - hiển thị cho tất cả users
 }
 
+@JsonDeserialize(using = MediaTypeDeserializer::class)
 enum class MediaType {
     IMAGE, VIDEO
 }
@@ -18,7 +21,7 @@ data class MediaFile(
     @Column(name = "file_url", nullable = false, length = 255)
     val fileUrl: String,
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = com.androidinsta.config.MediaTypeConverter::class)
     @Column(name = "file_type", nullable = false, columnDefinition = "ENUM('IMAGE', 'VIDEO') DEFAULT 'IMAGE'")
     val fileType: MediaType = MediaType.IMAGE,
 

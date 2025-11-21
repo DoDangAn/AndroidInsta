@@ -17,21 +17,35 @@ class PostService {
 
   /// Get feed posts
   static Future<FeedResponse> getFeed({int page = 0, int size = 20}) async {
-    final token = await _getToken();
-    if (token == null) throw Exception('Not authenticated');
+    try {
+      final token = await _getToken();
+      if (token == null) throw Exception('Not authenticated');
 
-    final response = await http.get(
-      Uri.parse('$baseUrl/feed?page=$page&size=$size'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
+      print('=== FETCHING FEED ===');
+      print('URL: $baseUrl/feed?page=$page&size=$size');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/feed?page=$page&size=$size'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
 
-    if (response.statusCode == 200) {
-      return FeedResponse.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Failed to load feed');
+      print('Feed response status: ${response.statusCode}');
+      print('Feed response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final feedResponse = FeedResponse.fromJson(jsonDecode(response.body));
+        print('Feed parsed successfully: ${feedResponse.posts.length} posts');
+        return feedResponse;
+      } else {
+        print('Feed failed with status: ${response.statusCode}');
+        throw Exception('Failed to load feed: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Feed error: $e');
+      rethrow;
     }
   }
 
@@ -148,6 +162,7 @@ class PostService {
     final token = await _getToken();
     if (token == null) throw Exception('Not authenticated');
 
+    print('Adding comment to post $postId: $content');
     final response = await http.post(
       Uri.parse('$baseUrl/$postId/comments'),
       headers: {
@@ -157,11 +172,14 @@ class PostService {
       body: jsonEncode({'content': content}),
     );
 
+    print('Add comment response: ${response.statusCode}');
+    print('Add comment body: ${response.body}');
+
     if (response.statusCode == 201) {
       final data = jsonDecode(response.body);
-      return Comment.fromJson(data['comment']);
+      return Comment.fromJson(data); // Backend trả về comment trực tiếp, không có wrapper
     } else {
-      throw Exception('Failed to add comment');
+      throw Exception('Failed to add comment: ${response.statusCode}');
     }
   }
 
@@ -169,6 +187,7 @@ class PostService {
   static Future<List<Comment>> getComments(int postId) async {
     final token = await _getToken();
 
+    print('Getting comments for post $postId');
     final response = await http.get(
       Uri.parse('$baseUrl/$postId/comments'),
       headers: {
@@ -177,31 +196,44 @@ class PostService {
       },
     );
 
+    print('Get comments response: ${response.statusCode}');
+    print('Get comments body: ${response.body}');
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return (data['comments'] as List)
-          .map((c) => Comment.fromJson(c))
-          .toList();
+      // Backend trả về array trực tiếp
+      if (data is List) {
+        return data.map((c) => Comment.fromJson(c)).toList();
+      } else {
+        // Fallback nếu có wrapper
+        return (data['comments'] as List)
+            .map((c) => Comment.fromJson(c))
+            .toList();
+      }
     } else {
       throw Exception('Failed to load comments');
     }
   }
 
   /// Delete a comment
-  static Future<void> deleteComment(int commentId) async {
+  static Future<void> deleteComment(int postId, int commentId) async {
     final token = await _getToken();
     if (token == null) throw Exception('Not authenticated');
 
+    print('Deleting comment $commentId from post $postId');
     final response = await http.delete(
-      Uri.parse('$baseUrl/comments/$commentId'),
+      Uri.parse('$baseUrl/$postId/comments/$commentId'),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
     );
 
+    print('Delete comment response: ${response.statusCode}');
+    print('Delete comment body: ${response.body}');
+
     if (response.statusCode != 200) {
-      throw Exception('Failed to delete comment');
+      throw Exception('Failed to delete comment: ${response.statusCode}');
     }
   }
 

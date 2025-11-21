@@ -119,7 +119,7 @@ class AuthController(
     @PostMapping("/change-password")
     fun changePassword(@Valid @RequestBody changePasswordRequest: ChangePasswordRequest): ResponseEntity<*> {
         return try {
-            val userId = SecurityUtil.getCurrentUserId()
+            val userId = SecurityUtil.getCurrentUserIdOrNull()
                 ?: throw RuntimeException("User not authenticated")
             
             authService.changePassword(userId, changePasswordRequest)
@@ -149,7 +149,7 @@ class AuthController(
     @GetMapping("/me")
     fun getCurrentUser(): ResponseEntity<*> {
         return try {
-            val userId = SecurityUtil.getCurrentUserId()
+            val userId = SecurityUtil.getCurrentUserIdOrNull()
                 ?: throw RuntimeException("User not authenticated")
             
             ResponseEntity.ok(
