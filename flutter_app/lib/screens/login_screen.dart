@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/login_service.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,6 +14,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email'],
+  );
 
   bool _isLoading = false;
   bool _isPasswordVisible = false;
@@ -59,6 +63,54 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        // User canceled the sign-in
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final response = await LoginService.googleLogin(
+        googleUser.email,
+        googleUser.id,
+        fullName: googleUser.displayName,
+        photoUrl: googleUser.photoUrl,
+      );
+
+      if (response.success && response.data != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('access_token', response.data!.accessToken);
+        await prefs.setString('refresh_token', response.data!.refreshToken);
+        await prefs.setInt('user_id', response.data!.user.id);
+        await prefs.setString('username', response.data!.user.username);
+        await prefs.setString('email', response.data!.user.email);
+
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -257,8 +309,44 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: Colors.grey[300])),
                     ],
+                  ),
+                  
+                  const SizedBox(height: 20),
+
+                  // Google Login Button
+                  TextButton(
+                    onPressed: _isLoading ? null : _handleGoogleSignIn,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Using a simple Icon if image asset is not available, or network image
+                        // For reliability in this demo, I'll use an Icon but styled to look nice
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Image.network(
+                            'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1200px-Google_%22G%22_logo.svg.png',
+                            height: 20,
+                            width: 20,
+                            errorBuilder: (context, error, stackTrace) => 
+                                const Icon(Icons.g_mobiledata, color: Colors.blue, size: 24),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Log in with Google',
+                          style: TextStyle(
+                            color: Color(0xFF385185),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   
                   const SizedBox(height: 40),

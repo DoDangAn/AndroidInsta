@@ -14,11 +14,13 @@ import com.androidinsta.dto.TokenRefreshRequest
 import com.androidinsta.dto.TokenRefreshResponse
 import com.androidinsta.dto.ChangePasswordRequest
 import com.androidinsta.dto.UserInfo
+import com.androidinsta.dto.GoogleLoginRequest
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import java.util.UUID
 
 @Service
 @Transactional
@@ -91,6 +93,54 @@ class AuthService(
         )
         
         return generateTokens(savedUser)
+
+    }
+
+    fun googleLogin(request: GoogleLoginRequest): JwtResponse {
+        // Check if user exists by email
+        val user = userRepository.findByEmail(request.email)
+            .orElseGet {
+                // Create new user if not exists
+                val userRole = roleRepository.findByName("USER")
+                    .orElseThrow { RuntimeException("Role USER not found") }
+
+                // Generate a unique username from email or random
+                var baseUsername = request.email.substringBefore("@")
+                var username = baseUsername
+                var counter = 1
+                while (userRepository.existsByUsername(username)) {
+                    username = "$baseUsername$counter"
+                    counter++
+                }
+
+                val newUser = User(
+                    username = username,
+                    email = request.email,
+                    // Generate a random password for Google users since they won't use it
+                    password = passwordEncoder.encode(UUID.randomUUID().toString()),
+                    fullName = request.fullName ?: username,
+                    role = userRole,
+                    createdAt = LocalDateTime.now(),
+                    isActive = true
+                )
+                
+                val savedUser = userRepository.save(newUser)
+
+                // Send user registered event to Kafka
+                kafkaProducerService.sendUserRegisteredEvent(
+                    userId = savedUser.id,
+                    username = savedUser.username,
+                    email = savedUser.email
+                )
+
+                savedUser
+            }
+
+        if (!user.isActive) {
+            throw RuntimeException("Account is deactivated")
+        }
+
+        return generateTokens(user)
     }
 
     fun refreshToken(tokenRefreshRequest: TokenRefreshRequest): TokenRefreshResponse {

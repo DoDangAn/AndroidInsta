@@ -80,6 +80,43 @@ class LoginService {
       throw Exception(message);
     }
   }
+  
+  static Future<LoginResponse> googleLogin(String email, String googleId, {String? fullName, String? photoUrl}) async {
+    try {
+      print('Attempting Google login for: $email');
+      final response = await http.post(
+        Uri.parse('$baseUrl/google'),
+        headers: ApiConfig.headers,
+        body: jsonEncode({
+          'email': email,
+          'googleId': googleId,
+          'fullName': fullName,
+          'photoUrl': photoUrl,
+        }),
+      );
+
+      print('Google login response status: ${response.statusCode}');
+      print('Google login response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return LoginResponse.fromJson(jsonDecode(response.body));
+      } else {
+        try {
+          final error = jsonDecode(response.body);
+          throw Exception(error['message'] ?? 'Google login failed with status ${response.statusCode}');
+        } catch (e) {
+          if (e is FormatException) {
+            throw Exception('Server returned invalid response: ${response.statusCode}');
+          }
+          rethrow;
+        }
+      }
+    } catch (e) {
+      print('Google login error: $e');
+      String message = e.toString().replaceAll('Exception: ', '');
+      throw Exception(message);
+    }
+  }
 
   static Future<LoginResponse> register(
     String username,

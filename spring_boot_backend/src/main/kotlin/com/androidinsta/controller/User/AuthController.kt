@@ -3,6 +3,7 @@ package com.androidinsta.controller.User
 import com.androidinsta.Service.AuthService
 import com.androidinsta.config.SecurityUtil
 import com.androidinsta.dto.*
+import com.androidinsta.dto.GoogleLoginRequest
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -40,6 +41,27 @@ class AuthController(
                 AuthResponse(
                     success = false,
                     message = e.message ?: "Login failed"
+                )
+            )
+        }
+    }
+    
+    @PostMapping("/google")
+    fun googleLogin(@Valid @RequestBody googleLoginRequest: GoogleLoginRequest): ResponseEntity<AuthResponse> {
+        return try {
+            val jwtResponse = authService.googleLogin(googleLoginRequest)
+            ResponseEntity.ok(
+                AuthResponse(
+                    success = true,
+                    message = "Google login successful",
+                    data = jwtResponse
+                )
+            )
+        } catch (e: Exception) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                AuthResponse(
+                    success = false,
+                    message = e.message ?: "Google login failed"
                 )
             )
         }

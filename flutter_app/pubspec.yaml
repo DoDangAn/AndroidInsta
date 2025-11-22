@@ -16,6 +16,7 @@ dependencies:
   timeago: ^3.6.1
   web_socket_channel: ^2.4.5
   stomp_dart_client: ^2.0.0
+  google_sign_in: ^6.2.1
 
 dev_dependencies:
   flutter_test:
