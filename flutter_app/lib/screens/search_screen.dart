@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/search_models.dart';
+import '../models/post_models.dart';
 import '../services/search_service.dart';
+import '../services/post_service.dart';
 import '../config/api_config.dart';
 import 'user_profile_screen.dart';
 import 'post_detail_screen.dart';
@@ -28,7 +30,8 @@ class _SearchScreenState extends State<SearchScreen>
   List<UserSearchResult> _userResults = [];
   List<PostSearchResult> _postResults = [];
   List<TagSearchResult> _tagResults = [];
-  List<TagSearchResult> _trendingTags = [];
+  List<PostDto> _recentPosts = [];
+  bool _isLoadingRecent = true;
 
   // Suggestions
   SearchSuggestions? _suggestions;
@@ -42,7 +45,7 @@ class _SearchScreenState extends State<SearchScreen>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(_onTabChanged);
-    _loadTrendingTags();
+    _loadRecentPosts();
   }
 
   @override
@@ -64,14 +67,27 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
-  Future<void> _loadTrendingTags() async {
+  Future<void> _loadRecentPosts() async {
+    print('=== LOADING RECENT POSTS ===');
+    setState(() {
+      _isLoadingRecent = true;
+    });
+    
     try {
-      final response = await _searchService.getTrendingTags();
+      print('Calling PostService.getAdvertisePosts...');
+      final response = await PostService.getAdvertisePosts(page: 0, size: 20);
+      print('Response received: ${response.posts.length} posts');
       setState(() {
-        _trendingTags = response.content;
+        _recentPosts = response.posts;
+        _isLoadingRecent = false;
       });
-    } catch (e) {
-      print('Error loading trending tags: $e');
+      print('Recent posts loaded successfully: ${_recentPosts.length} posts');
+    } catch (e, stackTrace) {
+      print('Error loading recent posts: $e');
+      print('Stack trace: $stackTrace');
+      setState(() {
+        _isLoadingRecent = false;
+      });
     }
   }
 
@@ -150,8 +166,23 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Future<void> _loadSuggestions(String query) async {
-    // Suggestions disabled for now
-    return;
+    if (query.length < 2) {
+      setState(() {
+        _suggestions = null;
+        _showSuggestions = false;
+      });
+      return;
+    }
+
+    try {
+      final suggestions = await _searchService.getSearchSuggestions(query: query);
+      setState(() {
+        _suggestions = suggestions;
+        _showSuggestions = true;
+      });
+    } catch (e) {
+      print('Error loading suggestions: $e');
+    }
   }
 
   void _onSearchChanged(String value) {
@@ -332,60 +363,112 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Widget _buildTrendingSection() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text(
-          'Trending Tags',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+    return RefreshIndicator(
+      onRefresh: _loadRecentPosts,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'Recent Posts',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        if (_trendingTags.isEmpty)
-          const Center(child: CircularProgressIndicator())
-        else
-          ..._trendingTags.map((tag) => _buildTrendingTagItem(tag)),
-      ],
+          if (_isLoadingRecent)
+            const Expanded(
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_recentPosts.isEmpty)
+            Expanded(
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
+                  SizedBox(height: 100),
+                  Center(
+                    child: Text(
+                      'No posts available',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Expanded(
+              child: GridView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(2),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 2,
+                  mainAxisSpacing: 2,
+                ),
+                itemCount: _recentPosts.length,
+                itemBuilder: (context, index) {
+                  final post = _recentPosts[index];
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PostDetailScreen(post: post),
+                        ),
+                      );
+                    },
+                    child: _buildRecentPostItem(post),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _buildTrendingTagItem(TagSearchResult tag) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.purple, Colors.pink],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  Widget _buildRecentPostItem(PostDto post) {
+    final mediaFile = post.mediaFiles.isNotEmpty ? post.mediaFiles[0] : null;
+    
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (mediaFile != null)
+          Image.network(
+            mediaFile.fileUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                color: Colors.grey[300],
+                child: const Icon(Icons.image, color: Colors.grey),
+              );
+            },
+          )
+        else
+          Container(
+            color: Colors.grey[300],
+            child: const Icon(Icons.image, color: Colors.grey),
+          ),
+        if (post.mediaFiles.length > 1)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Icon(
+                Icons.collections,
+                color: Colors.white,
+                size: 16,
+              ),
             ),
-            shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.tag, color: Colors.white),
-        ),
-        title: Text(
-          '#${tag.name}',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Text('${tag.postsCount} posts'),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: () {
-          _searchController.text = tag.name;
-          _onSearchSubmitted(tag.name);
-        },
-      ),
+      ],
     );
   }
 

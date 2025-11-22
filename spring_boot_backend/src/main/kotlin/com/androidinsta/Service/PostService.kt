@@ -134,9 +134,9 @@ class PostService(
     }
     
     /**
-     * Lấy ADVERTISE posts (quảng cáo)
+     * Lấy PUBLIC posts (bài viết công khai gần đây)
      */
     fun getAdvertisePosts(pageable: Pageable): Page<Post> {
-        return postRepository.findAdvertisePosts(pageable)
+        return postRepository.findByVisibilityOrderByCreatedAtDesc(Visibility.PUBLIC, pageable)
     }
 }

@@ -68,6 +68,25 @@ class PostService {
     }
   }
 
+  /// Get advertise/public posts
+  static Future<FeedResponse> getAdvertisePosts({int page = 0, int size = 20}) async {
+    final token = await _getToken();
+    
+    final response = await http.get(
+      Uri.parse('$baseUrl/advertise?page=$page&size=$size'),
+      headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return FeedResponse.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load advertise posts');
+    }
+  }
+
   /// Get a single post by ID
   static Future<PostDto> getPostById(int postId) async {
     final token = await _getToken();

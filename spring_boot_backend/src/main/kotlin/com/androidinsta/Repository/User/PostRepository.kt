@@ -59,6 +59,14 @@ interface PostRepository : JpaRepository<Post, Long> {
     fun findAdvertisePosts(pageable: Pageable): Page<Post>
     
     /**
+     * Lấy tất cả posts theo visibility
+     */
+    fun findByVisibilityOrderByCreatedAtDesc(
+        visibility: Visibility,
+        pageable: Pageable
+    ): Page<Post>
+    
+    /**
      * Tìm kiếm posts theo từ khóa (caption hoặc username)
      */
     @Query("""
