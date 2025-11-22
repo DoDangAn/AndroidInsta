@@ -5,6 +5,7 @@ class UserSearchResult {
   final String? avatarUrl;
   final bool isVerified;
   final int followersCount;
+  final bool isFollowing;
 
   UserSearchResult({
     required this.id,
@@ -13,6 +14,7 @@ class UserSearchResult {
     this.avatarUrl,
     required this.isVerified,
     required this.followersCount,
+    this.isFollowing = false,
   });
 
   factory UserSearchResult.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class UserSearchResult {
       avatarUrl: json['avatarUrl'],
       isVerified: json['isVerified'] ?? false,
       followersCount: json['followersCount'] ?? 0,
+      isFollowing: json['isFollowing'] ?? false,
     );
   }
 }

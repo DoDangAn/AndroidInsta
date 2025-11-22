@@ -26,18 +26,25 @@ class SearchService(
     /**
      * Tìm kiếm users
      */
-    fun searchUsers(keyword: String, pageable: Pageable): Page<UserSearchResult> {
+    fun searchUsers(keyword: String, pageable: Pageable, currentUserId: Long? = null): Page<UserSearchResult> {
         val users = userRepository.searchUsers(keyword)
         
         val results = users.map { user ->
             val followersCount = followRepository.countByFollowedId(user.id)
+            val isFollowing = if (currentUserId != null && currentUserId != user.id) {
+                followRepository.existsByFollowerIdAndFollowedId(currentUserId, user.id)
+            } else {
+                false
+            }
+            
             UserSearchResult(
                 id = user.id,
                 username = user.username,
                 fullName = user.fullName,
                 avatarUrl = user.avatarUrl,
                 isVerified = user.isVerified,
-                followersCount = followersCount
+                followersCount = followersCount,
+                isFollowing = isFollowing
             )
         }
         

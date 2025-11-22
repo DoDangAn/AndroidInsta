@@ -282,4 +282,54 @@ class UserController(
             )
         }
     }
+
+    /**
+     * GET /api/users/{userId}/follow-status - Check if current user follows this user
+     */
+    @GetMapping("/{userId}/follow-status")
+    fun getFollowStatus(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
+        val currentUserId = SecurityUtil.getCurrentUserId()
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf(
+                "success" to false,
+                "message" to "Unauthorized"
+            ))
+
+        return try {
+            val isFollowing = followService.isFollowing(currentUserId, userId)
+            ResponseEntity.ok(mapOf(
+                "success" to true,
+                "isFollowing" to isFollowing
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "success" to false,
+                "message" to (e.message ?: "Failed to get follow status")
+            ))
+        }
+    }
+
+    /**
+     * GET /api/users/{userId}/stats - Get user statistics
+     */
+    @GetMapping("/{userId}/stats")
+    fun getUserStats(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
+        return try {
+            val followersCount = followService.getFollowersCount(userId)
+            val followingCount = followService.getFollowingCount(userId)
+            // For now, return 0 for posts count - can be implemented later
+            val postsCount = 0L
+
+            ResponseEntity.ok(mapOf(
+                "success" to true,
+                "followersCount" to followersCount,
+                "followingCount" to followingCount,
+                "postsCount" to postsCount
+            ))
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "success" to false,
+                "message" to (e.message ?: "Failed to get stats")
+            ))
+        }
+    }
 }

@@ -10,6 +10,7 @@ import 'create_post_screen.dart';
 import 'post_detail_screen.dart';
 import 'notification_screen.dart';
 import 'search_screen.dart';
+import 'user_profile_screen.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -175,76 +176,80 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFeedPage() {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          floating: true,
-          title: const Text(
-            'Instagram',
-            style: TextStyle(
-              fontFamily: 'Billabong',
-              fontSize: 32,
-              color: Colors.black,
-              fontWeight: FontWeight.w400,
+    return RefreshIndicator(
+      onRefresh: _loadPosts,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverAppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            floating: true,
+            title: const Text(
+              'Instagram',
+              style: TextStyle(
+                fontFamily: 'Billabong',
+                fontSize: 32,
+                color: Colors.black,
+                fontWeight: FontWeight.w400,
+              ),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.favorite_border, color: Colors.black),
+                onPressed: () {
+                  setState(() {
+                    _selectedIndex = 3;
+                  });
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.send_outlined, color: Colors.black),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ChatListScreen()),
+                  );
+                },
+              ),
+            ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.favorite_border, color: Colors.black),
-              onPressed: () {
-                setState(() {
-                  _selectedIndex = 3;
-                });
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.send_outlined, color: Colors.black),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ChatListScreen()),
-                );
-              },
-            ),
-          ],
-        ),
-        SliverToBoxAdapter(
-          child: _buildStoriesRow(),
-        ),
-        _posts.isEmpty
-            ? SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No posts yet',
-                        style: TextStyle(fontSize: 18, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton(
-                        onPressed: _loadPosts,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
+          SliverToBoxAdapter(
+            child: _buildStoriesRow(),
+          ),
+          _posts.isEmpty
+              ? SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.photo_library_outlined, size: 64, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No posts yet',
+                          style: TextStyle(fontSize: 18, color: Colors.grey),
                         ),
-                        child: const Text('Refresh'),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: _loadPosts,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Refresh'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildPostCard(_posts[index]),
+                    childCount: _posts.length,
                   ),
                 ),
-              )
-            : SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => _buildPostCard(_posts[index]),
-                  childCount: _posts.length,
-                ),
-              ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -342,11 +347,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ProfileScreen(
+                          builder: (context) => UserProfileScreen(
                             userId: post.user.id,
+                            username: post.user.username,
                           ),
                         ),
                       );
+                    } else {
+                      // Navigate to own profile tab
+                      setState(() {
+                        _selectedIndex = 4;
+                      });
                     }
                   },
                   child: CircleAvatar(
@@ -374,11 +385,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => ProfileScreen(
+                            builder: (context) => UserProfileScreen(
                               userId: post.user.id,
+                              username: post.user.username,
                             ),
                           ),
                         );
+                      } else {
+                        // Navigate to own profile tab
+                        setState(() {
+                          _selectedIndex = 4;
+                        });
                       }
                     },
                     child: Text(

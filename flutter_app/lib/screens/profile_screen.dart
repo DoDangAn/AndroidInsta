@@ -172,19 +172,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       )
-          : SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildProfileHeader(),
-            const SizedBox(height: 16),
-            _buildBioSection(),
-            const SizedBox(height: 16),
-            _buildActionButtons(),
-            const Divider(height: 1),
-            _buildPostGrid(),
-          ],
-        ),
-      ),
+          : RefreshIndicator(
+              onRefresh: _initUserIdAndLoad,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    _buildProfileHeader(),
+                    const SizedBox(height: 16),
+                    _buildBioSection(),
+                    const SizedBox(height: 16),
+                    _buildActionButtons(),
+                    const Divider(height: 1),
+                    _buildPostGrid(),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 

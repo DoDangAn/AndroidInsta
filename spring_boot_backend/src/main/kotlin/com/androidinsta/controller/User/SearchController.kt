@@ -28,8 +28,14 @@ class SearchController(
             return ResponseEntity.badRequest().build()
         }
         
+        val currentUserId = try {
+            com.androidinsta.config.SecurityUtil.getCurrentUserId()
+        } catch (e: Exception) {
+            null
+        }
+        
         val pageable = PageRequest.of(page, size)
-        val results = searchService.searchUsers(keyword.trim(), pageable)
+        val results = searchService.searchUsers(keyword.trim(), pageable, currentUserId)
         return ResponseEntity.ok(results)
     }
 
@@ -134,8 +140,14 @@ class SearchController(
             ))
         }
         
+        val currentUserId = try {
+            com.androidinsta.config.SecurityUtil.getCurrentUserId()
+        } catch (e: Exception) {
+            null
+        }
+        
         val pageable = PageRequest.of(0, limit)
-        val users = searchService.searchUsers(query.trim(), pageable).content
+        val users = searchService.searchUsers(query.trim(), pageable, currentUserId).content
         val tags = searchService.searchTags(query.trim(), pageable).content
         
         return ResponseEntity.ok(mapOf(

@@ -10,7 +10,8 @@ data class UserSearchResult(
     val fullName: String?,
     val avatarUrl: String?,
     val isVerified: Boolean,
-    val followersCount: Long = 0
+    val followersCount: Long = 0,
+    val isFollowing: Boolean = false
 )
 
 data class PostSearchResult(

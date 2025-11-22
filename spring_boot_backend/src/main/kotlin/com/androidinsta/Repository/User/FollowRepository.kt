@@ -5,6 +5,7 @@ import com.androidinsta.Model.FollowId
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.stereotype.Repository
 
 @Repository
@@ -40,6 +41,7 @@ interface FollowRepository : JpaRepository<Follow, FollowId> {
     /**
      * Xóa follow relationship
      */
+    @Modifying
     @Query("DELETE FROM Follow f WHERE f.follower.id = :followerId AND f.followed.id = :followedId")
     fun deleteByFollowerIdAndFollowedId(
         @Param("followerId") followerId: Long,

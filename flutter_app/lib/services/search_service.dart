@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/search_models.dart';
+import '../config/api_config.dart';
 
 class SearchService {
-  static const String baseUrl = 'http://10.0.2.2:8080/api/search';
+  static const String baseUrl = '${ApiConfig.baseUrl}/api/search';
 
   // Get auth token
   Future<String?> _getToken() async {

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/search_models.dart';
 import '../services/search_service.dart';
+import '../config/api_config.dart';
 import 'user_profile_screen.dart';
 import 'post_detail_screen.dart';
 
@@ -529,6 +532,7 @@ class _SearchScreenState extends State<SearchScreen>
           ),
         ],
       ),
+      trailing: _buildFollowButton(user),
       onTap: () {
         Navigator.push(
           context,
@@ -538,6 +542,95 @@ class _SearchScreenState extends State<SearchScreen>
         );
       },
     );
+  }
+
+  Widget _buildFollowButton(UserSearchResult user) {
+    // Don't show follow button if it's the current user
+    // You can add logic here to check if user.id == currentUserId
+    
+    return SizedBox(
+      width: 100,
+      child: ElevatedButton(
+        onPressed: () => _toggleFollow(user),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: user.isFollowing ? Colors.grey[300] : Colors.blue,
+          foregroundColor: user.isFollowing ? Colors.black : Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        child: Text(
+          user.isFollowing ? 'Đang theo dõi' : 'Theo dõi',
+          style: const TextStyle(fontSize: 12),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleFollow(UserSearchResult user) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      
+      if (token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vui lòng đăng nhập')),
+        );
+        return;
+      }
+
+      final url = user.isFollowing
+          ? '${ApiConfig.baseUrl}/api/users/${user.id}/follow'
+          : '${ApiConfig.baseUrl}/api/users/${user.id}/follow';
+      
+      final response = user.isFollowing
+          ? await http.delete(
+              Uri.parse(url),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            )
+          : await http.post(
+              Uri.parse(url),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          // Update the follow status in the results
+          final index = _userResults.indexWhere((u) => u.id == user.id);
+          if (index != -1) {
+            _userResults[index] = UserSearchResult(
+              id: user.id,
+              username: user.username,
+              fullName: user.fullName,
+              avatarUrl: user.avatarUrl,
+              isVerified: user.isVerified,
+              followersCount: user.isFollowing 
+                  ? user.followersCount - 1 
+                  : user.followersCount + 1,
+              isFollowing: !user.isFollowing,
+            );
+          }
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(user.isFollowing ? 'Đã bỏ theo dõi' : 'Đã theo dõi'),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e')),
+      );
+    }
   }
 
   Widget _buildPostResults() {

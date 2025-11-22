@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/user_service.dart';
 import '../models/user_models.dart';
-import 'profile_screen.dart';
+import 'user_profile_screen.dart';
 
 class FollowersScreen extends StatefulWidget {
   final int userId;
@@ -102,31 +102,43 @@ class _FollowersScreenState extends State<FollowersScreen> {
                     ],
                   ),
                 )
-              : _users.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No ${widget.title.toLowerCase()} yet',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
+              : RefreshIndicator(
+                  onRefresh: _loadUsers,
+                  child: _users.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.7,
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No ${widget.title.toLowerCase()} yet',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _users.length,
-                      itemBuilder: (context, index) {
-                        final user = _users[index];
-                        return _buildUserTile(user);
-                      },
-                    ),
+                          ],
+                        )
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: _users.length,
+                          itemBuilder: (context, index) {
+                            final user = _users[index];
+                            return _buildUserTile(user);
+                          },
+                        ),
+                ),
     );
   }
 
@@ -175,7 +187,10 @@ class _FollowersScreenState extends State<FollowersScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProfileScreen(userId: user.id),
+            builder: (context) => UserProfileScreen(
+              userId: user.id,
+              username: user.username,
+            ),
           ),
         );
       },

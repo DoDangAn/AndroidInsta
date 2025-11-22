@@ -82,6 +82,9 @@ class UserService {
     final token = await _getToken();
     if (token == null) throw Exception('Not authenticated');
 
+    print('FollowUser API call for userId: $userId');
+    print('Using baseUrl: $baseUrl');
+    
     final response = await http.post(
       Uri.parse('$baseUrl/$userId/follow'),
       headers: {
@@ -90,11 +93,17 @@ class UserService {
       },
     );
 
+    print('Follow response status: ${response.statusCode}');
+    print('Follow response body: ${response.body}');
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['success'] ?? false;
+      final success = data['success'] ?? false;
+      print('Follow success: $success');
+      return success;
     } else {
-      throw Exception('Failed to follow user');
+      print('Follow failed with status: ${response.statusCode}');
+      throw Exception('Failed to follow user: ${response.body}');
     }
   }
 
@@ -103,6 +112,9 @@ class UserService {
     final token = await _getToken();
     if (token == null) throw Exception('Not authenticated');
 
+    print('UnfollowUser API call for userId: $userId');
+    print('Using baseUrl: $baseUrl');
+    
     final response = await http.delete(
       Uri.parse('$baseUrl/$userId/follow'),
       headers: {
@@ -111,11 +123,23 @@ class UserService {
       },
     );
 
+    print('Unfollow response status: ${response.statusCode}');
+    print('Unfollow response body: ${response.body}');
+
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['success'] ?? false;
+      try {
+        final data = jsonDecode(response.body);
+        final success = data['success'] ?? false;
+        print('Unfollow success: $success');
+        return success;
+      } catch (e) {
+        print('Error parsing unfollow response: $e');
+        // If status is 200 but parsing fails, it might still be successful if body is empty or string
+        return true; 
+      }
     } else {
-      throw Exception('Failed to unfollow user');
+      print('Unfollow failed with status: ${response.statusCode}');
+      throw Exception('Failed to unfollow user: ${response.body}');
     }
   }
 
@@ -123,6 +147,7 @@ class UserService {
   static Future<UserStats> getUserStats(int userId) async {
     final token = await _getToken();
 
+    print('Getting stats for userId: $userId');
     final response = await http.get(
       Uri.parse('$baseUrl/$userId/stats'),
       headers: {
@@ -131,9 +156,17 @@ class UserService {
       },
     );
 
+    print('Stats response status: ${response.statusCode}');
+    print('Stats response body: ${response.body}');
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return UserStats.fromJson(data['stats']);
+      // Handle both nested 'stats' and flat structure
+      if (data['stats'] != null) {
+        return UserStats.fromJson(data['stats']);
+      } else {
+        return UserStats.fromJson(data);
+      }
     } else {
       throw Exception('Failed to load user stats');
     }
@@ -222,47 +255,19 @@ class UserService {
     final token = await _getToken();
     if (token == null) throw Exception('Not authenticated');
 
-    try {
-      final uri = Uri.parse('${ApiConfig.postsUrl}/upload-avatar');
-      final request = http.MultipartRequest('POST', uri);
+    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/avatar'));
+    request.headers['Authorization'] = 'Bearer $token';
+    
+    request.files.add(await http.MultipartFile.fromPath('file', imagePath));
 
-      // Add headers
-      request.headers['Authorization'] = 'Bearer $token';
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
 
-      // Determine content type based on file extension
-      String contentType = 'image/jpeg';
-      final extension = imagePath.toLowerCase().split('.').last;
-      if (extension == 'png') {
-        contentType = 'image/png';
-      } else if (extension == 'jpg' || extension == 'jpeg') {
-        contentType = 'image/jpeg';
-      } else if (extension == 'gif') {
-        contentType = 'image/gif';
-      } else if (extension == 'webp') {
-        contentType = 'image/webp';
-      }
-
-      // Add image file with explicit content type
-      final file = await http.MultipartFile.fromPath(
-        'avatar',
-        imagePath,
-        contentType: http_parser.MediaType.parse(contentType),
-      );
-      request.files.add(file);
-
-      // Send request
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['avatarUrl'] as String;
-      } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Failed to upload avatar');
-      }
-    } catch (e) {
-      throw Exception('Failed to upload avatar: $e');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['avatarUrl'];
+    } else {
+      throw Exception('Failed to upload avatar');
     }
   }
 }
