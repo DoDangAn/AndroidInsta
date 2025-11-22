@@ -162,6 +162,87 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  void _showEditPostDialog() {
+    final captionController = TextEditingController(text: _post!.caption);
+    String visibility = _post!.visibility;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Post'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: captionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Caption',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: visibility,
+                  decoration: const InputDecoration(
+                    labelText: 'Visibility',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: ['PUBLIC', 'PRIVATE', 'FRIENDS'].map((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        visibility = newValue;
+                      });
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                final updatedPost = await PostService.updatePost(
+                  _post!.id,
+                  caption: captionController.text,
+                  visibility: visibility,
+                );
+                if (!mounted) return;
+                Navigator.pop(context);
+                setState(() {
+                  _post = updatedPost;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Post updated successfully')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoadingPost || _post == null) {
@@ -207,8 +288,35 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         actions: [
           if (_post!.isOwner)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
-              onPressed: _deletePost,
+              icon: const Icon(Icons.more_vert, color: Colors.black),
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  builder: (context) => SafeArea(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.edit),
+                          title: const Text('Edit'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _showEditPostDialog();
+                          },
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.delete, color: Colors.red),
+                          title: const Text('Delete', style: TextStyle(color: Colors.red)),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _deletePost();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
         ],
       ),

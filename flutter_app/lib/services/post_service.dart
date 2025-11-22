@@ -134,6 +134,30 @@ class PostService {
     }
   }
 
+  /// Update a post
+  static Future<PostDto> updatePost(int postId, {String? caption, String? visibility}) async {
+    final token = await _getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.put(
+      Uri.parse('$baseUrl/$postId'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'caption': caption,
+        'visibility': visibility,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return PostDto.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to update post');
+    }
+  }
+
   /// Like a post
   static Future<bool> likePost(int postId) async {
     final token = await _getToken();

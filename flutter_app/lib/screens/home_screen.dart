@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
-import '../services/login_service.dart';
 import '../services/post_service.dart';
 import '../models/post_models.dart';
-import 'chat_list_screen.dart';
-import 'profile_screen.dart';
+import 'login_screen.dart';
 import 'create_post_screen.dart';
-import 'post_detail_screen.dart';
-import 'notification_screen.dart';
-import 'search_screen.dart';
+import 'profile_screen.dart';
 import 'user_profile_screen.dart';
-
+import 'search_screen.dart';
+import 'notification_screen.dart';
+import 'post_detail_screen.dart';
+import 'chat_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,92 +21,57 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  String _username = '';
-  String _email = '';
-  int? _userId;
-  bool _isLoading = true;
   List<PostDto> _posts = [];
+  bool _isLoading = true;
+  int _userId = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadUserInfo();
+    _loadUserId();
+    _loadPosts();
   }
 
-  Future<void> _loadUserInfo() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      
-      if (token != null) {
-        await LoginService.getCurrentUser(token);
-        
-        setState(() {
-          _username = prefs.getString('username') ?? '';
-          _email = prefs.getString('email') ?? '';
-          _userId = prefs.getInt('user_id');
-          _isLoading = false;
-        });
-        
-        _loadPosts();
-      } else {
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/login');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
-    }
+  Future<void> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userId = prefs.getInt('user_id') ?? 0;
+    });
   }
 
   Future<void> _loadPosts() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final feedResponse = await PostService.getFeed();
       setState(() {
         _posts = feedResponse.posts;
+        _isLoading = false;
       });
     } catch (e) {
       print('Error loading posts: $e');
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (e.toString().contains('401') || e.toString().contains('Not authenticated')) {
+        _handleLogout();
+      }
     }
   }
 
-  Future<void> _logout() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      
-      if (token != null) {
-        await LoginService.logout(token);
-      }
-      
-      // Clear stored data
-      await prefs.clear();
-      
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Logged out successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      // Even if logout fails on server, clear local data
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-      
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
+  Future<void> _handleLogout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
     }
   }
 
   void _onBottomNavTap(int index) {
-    // Refresh feed when coming back from profile tab
     if (_selectedIndex == 4 && index == 0) {
       _loadPosts();
     }
@@ -119,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_isLoading && _posts.isEmpty) {
       return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(),
@@ -133,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildFeedPage(),
           const SearchScreen(),
-          _buildAddPostPage(),
+          _buildAddPostPlaceholder(),
           const NotificationScreen(),
           ProfileScreen(userId: _userId),
         ],
@@ -148,12 +112,13 @@ class _HomeScreenState extends State<HomeScreen> {
         showUnselectedLabels: false,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
+            icon: Icon(Icons.home_filled),
             activeIcon: Icon(Icons.home),
             label: 'Home',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.search),
+            activeIcon: Icon(Icons.search, weight: 600),
             label: 'Search',
           ),
           BottomNavigationBarItem(
@@ -255,58 +220,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildStoriesRow() {
     return Container(
-      height: 110,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Colors.grey[300]!, width: 0.5),
-        ),
-      ),
+      height: 100,
+      margin: const EdgeInsets.only(top: 8, bottom: 8),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
         itemCount: 10,
         itemBuilder: (context, index) {
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Column(
               children: [
                 Container(
-                  width: 70,
-                  height: 70,
-                  decoration: const BoxDecoration(
+                  width: 65,
+                  height: 65,
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topRight,
-                      end: Alignment.bottomLeft,
-                      colors: [
-                        Color(0xFFFBAA47),
-                        Color(0xFFD91A46),
-                        Color(0xFFA60F93),
-                      ],
+                    border: Border.all(
+                      color: index == 0 ? Colors.grey[300]! : Colors.red,
+                      width: 2,
                     ),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(3),
+                    padding: const EdgeInsets.all(2),
                     child: Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
+                        color: Colors.grey[300],
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(3),
-                        child: CircleAvatar(
-                          backgroundColor: Colors.grey[300],
-                          child: Text(
-                            '${index + 1}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ),
-                      ),
+                      child: index == 0
+                          ? const Icon(Icons.add, color: Colors.black)
+                          : const Icon(Icons.person, color: Colors.white),
                     ),
                   ),
                 ),
@@ -328,6 +271,85 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showEditPostDialog(PostDto post) {
+    final captionController = TextEditingController(text: post.caption);
+    String visibility = post.visibility;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Post'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: captionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Caption',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: visibility,
+                  decoration: const InputDecoration(
+                    labelText: 'Visibility',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: ['PUBLIC', 'PRIVATE', 'FRIENDS'].map((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        visibility = newValue;
+                      });
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                await PostService.updatePost(
+                  post.id,
+                  caption: captionController.text,
+                  visibility: visibility,
+                );
+                if (!mounted) return;
+                Navigator.pop(context);
+                _loadPosts();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Post updated successfully')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPostCard(PostDto post) {
     return Container(
       color: Colors.white,
@@ -335,14 +357,12 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Post header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
                 GestureDetector(
                   onTap: () {
-                    // Don't navigate to own profile from post
                     if (post.user.id != _userId) {
                       Navigator.push(
                         context,
@@ -354,7 +374,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       );
                     } else {
-                      // Navigate to own profile tab
                       setState(() {
                         _selectedIndex = 4;
                       });
@@ -380,7 +399,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      // Don't navigate to own profile from post
                       if (post.user.id != _userId) {
                         Navigator.push(
                           context,
@@ -392,7 +410,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         );
                       } else {
-                        // Navigate to own profile tab
                         setState(() {
                           _selectedIndex = 4;
                         });
@@ -429,7 +446,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
                               },
                             ),
-                            if (post.user.id == _userId)
+                            if (post.user.id == _userId) ...[
+                              ListTile(
+                                leading: const Icon(Icons.edit),
+                                title: const Text('Edit'),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _showEditPostDialog(post);
+                                },
+                              ),
                               ListTile(
                                 leading: const Icon(Icons.delete, color: Colors.red),
                                 title: const Text('Delete', style: TextStyle(color: Colors.red)),
@@ -460,19 +485,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                       _loadPosts();
                                       if (mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Post deleted')),
+                                          const SnackBar(content: Text('Post deleted successfully')),
                                         );
                                       }
                                     } catch (e) {
                                       if (mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Error: $e')),
+                                          SnackBar(content: Text('Error deleting post: $e')),
                                         );
                                       }
                                     }
                                   }
                                 },
                               ),
+                            ],
                             ListTile(
                               leading: const Icon(Icons.link),
                               title: const Text('Copy link'),
@@ -492,7 +518,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          // Post image
           if (post.mediaFiles.isNotEmpty && post.mediaFiles[0].fileUrl.isNotEmpty)
             Image.network(
               post.mediaFiles[0].fileUrl,
@@ -529,7 +554,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Icon(Icons.photo, size: 64, color: Colors.grey),
               ),
             ),
-          // Action buttons
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
@@ -584,7 +608,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          // Likes count
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Text(
@@ -595,7 +618,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          // Caption
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
             child: RichText(
@@ -611,17 +633,24 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          // Comments count
-          // Comments count
           if (post.commentsCount > 0)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Text(
-                'View all ${post.commentsCount} comments',
-                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PostDetailScreen(post: post),
+                    ),
+                  );
+                },
+                child: Text(
+                  'View all ${post.commentsCount} comments',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                ),
               ),
             ),
-          // Timestamp
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Text(
@@ -635,49 +664,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSearchPage() {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const TextField(
-            decoration: InputDecoration(
-              hintText: 'Search',
-              prefixIcon: Icon(Icons.search, color: Colors.grey),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 10),
-            ),
-          ),
-        ),
-      ),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(2),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 2,
-          mainAxisSpacing: 2,
-        ),
-        itemCount: 30,
-        itemBuilder: (context, index) {
-          return Container(
-            color: Colors.grey[300],
-            child: const Center(
-              child: Icon(Icons.image, size: 64, color: Colors.grey),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildAddPostPage() {
+  Widget _buildAddPostPlaceholder() {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -685,46 +672,99 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         title: const Text(
           'Create Post',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        centerTitle: true,
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.add_photo_alternate_outlined,
-              size: 100,
-              color: Colors.grey,
-            ),
+            Icon(Icons.add_photo_alternate_outlined, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 24),
-            const Text(
-              'Create new post',
+            Text(
+              'Create a new post',
               style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w300,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Share photos and videos with your friends',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
               ),
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: _pickImageFromGallery,
+              onPressed: () async {
+                try {
+                  final ImagePicker picker = ImagePicker();
+                  final XFile? image = await picker.pickImage(
+                    source: ImageSource.gallery,
+                    imageQuality: 80,
+                  );
+                  
+                  if (image != null) {
+                    if (!mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreatePostScreen(imagePath: image.path),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error picking image: $e')),
+                  );
+                }
+              },
               icon: const Icon(Icons.photo_library),
-              label: const Text('Select from Gallery'),
+              label: const Text('Select Photo'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               ),
             ),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: _takePhotoWithCamera,
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () async {
+                try {
+                  final ImagePicker picker = ImagePicker();
+                  final XFile? image = await picker.pickImage(
+                    source: ImageSource.camera,
+                    imageQuality: 80,
+                  );
+                  
+                  if (image != null) {
+                    if (!mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreatePostScreen(imagePath: image.path),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error taking photo: $e')),
+                  );
+                }
+              },
               icon: const Icon(Icons.camera_alt),
               label: const Text('Take Photo'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue,
+                side: const BorderSide(color: Colors.blue),
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               ),
             ),
@@ -734,107 +774,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 7) {
-      return '${date.day}/${date.month}/${date.year}';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays} days ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} hours ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} minutes ago';
-    } else {
-      return 'Just now';
-    }
-  }
-
-  String _formatDateTime(String dateTimeStr) {
+  String _formatDateTime(String isoString) {
     try {
-      final date = DateTime.parse(dateTimeStr);
-      return _formatDate(date);
-    } catch (e) {
-      return dateTimeStr;
-    }
-  }
+      final date = DateTime.parse(isoString);
+      final now = DateTime.now();
+      final difference = now.difference(date);
 
-  Future<void> _pickImageFromGallery() async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1920,
-        maxHeight: 1920,
-        imageQuality: 85,
-      );
-
-      if (image != null && mounted) {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CreatePostScreen(imagePath: image.path),
-          ),
-        );
-
-        // If post was created successfully, refresh the feed
-        if (result == true) {
-          setState(() {
-            _selectedIndex = 0; // Switch back to home feed
-          });
-          _loadPosts();
-        }
+      if (difference.inDays > 7) {
+        return '${date.day}/${date.month}/${date.year}';
+      } else if (difference.inDays > 0) {
+        return '${difference.inDays} days ago';
+      } else if (difference.inHours > 0) {
+        return '${difference.inHours} hours ago';
+      } else if (difference.inMinutes > 0) {
+        return '${difference.inMinutes} minutes ago';
+      } else {
+        return 'Just now';
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error selecting image: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _takePhotoWithCamera() async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1920,
-        maxHeight: 1920,
-        imageQuality: 85,
-      );
-
-      if (image != null && mounted) {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CreatePostScreen(imagePath: image.path),
-          ),
-        );
-
-        // If post was created successfully, refresh the feed
-        if (result == true) {
-          setState(() {
-            _selectedIndex = 0; // Switch back to home feed
-          });
-          _loadPosts();
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error taking photo: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      return '';
     }
   }
 }

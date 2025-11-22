@@ -53,11 +53,11 @@ class Post(
     val user: User,
 
     @Column(columnDefinition = "TEXT")
-    val caption: String? = null,
+    var caption: String? = null,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "ENUM('PUBLIC', 'PRIVATE', 'ADVERTISE') DEFAULT 'PUBLIC'")
-    val visibility: Visibility = Visibility.PUBLIC,
+    var visibility: Visibility = Visibility.PUBLIC,
 
 
     @ElementCollection

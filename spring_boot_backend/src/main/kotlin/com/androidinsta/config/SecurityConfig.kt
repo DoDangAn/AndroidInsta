@@ -55,6 +55,7 @@ class SecurityConfig(
                     .requestMatchers("/ws/**").permitAll() // WebSocket endpoint
                     .requestMatchers("/error").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
+                    .requestMatchers("/api/search/**").permitAll() // Allow search endpoints
                     
                     // Admin endpoints
                     .requestMatchers("/api/admin/**").hasRole("ADMIN")

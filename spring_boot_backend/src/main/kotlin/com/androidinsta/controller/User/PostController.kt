@@ -99,6 +99,27 @@ class PostController(
         postService.deletePost(postId, userId)
         return ResponseEntity.noContent().build()
     }
+
+    /**
+     * PUT /api/posts/{postId} - Cập nhật post
+     */
+    @PutMapping("/{postId}")
+    fun updatePost(
+        @PathVariable postId: Long,
+        @RequestBody request: PostUpdateRequest
+    ): ResponseEntity<PostDto> {
+        val userId = SecurityUtil.getCurrentUserId()
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            
+        val updatedPost = postService.updatePost(
+            postId = postId,
+            userId = userId,
+            caption = request.caption,
+            visibility = request.visibility
+        )
+        
+        return ResponseEntity.ok(updatedPost.toDto(userId))
+    }
     
     /**
      * GET /api/posts/{postId} - Lấy chi tiết một post

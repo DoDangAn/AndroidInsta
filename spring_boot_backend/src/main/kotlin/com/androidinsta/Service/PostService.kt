@@ -109,6 +109,29 @@ class PostService(
         
         postRepository.delete(post)
     }
+
+    /**
+     * Cập nhật post
+     */
+    @Transactional
+    fun updatePost(postId: Long, userId: Long, caption: String?, visibility: Visibility?): Post {
+        val post = postRepository.findById(postId)
+            .orElseThrow { RuntimeException("Post not found") }
+            
+        if (post.user.id != userId) {
+            throw RuntimeException("You can only update your own posts")
+        }
+        
+        if (caption != null) {
+            post.caption = caption
+        }
+        
+        if (visibility != null) {
+            post.visibility = visibility
+        }
+        
+        return postRepository.save(post)
+    }
     
     /**
      * Lấy ADVERTISE posts (quảng cáo)

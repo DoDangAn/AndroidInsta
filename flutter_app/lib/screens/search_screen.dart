@@ -140,7 +140,7 @@ class _SearchScreenState extends State<SearchScreen>
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi tìm kiếm: $e')),
+        SnackBar(content: Text('Search error: $e')),
       );
     } finally {
       setState(() {
@@ -150,23 +150,8 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Future<void> _loadSuggestions(String query) async {
-    if (query.length < 2) {
-      setState(() {
-        _suggestions = null;
-        _showSuggestions = false;
-      });
-      return;
-    }
-
-    try {
-      final suggestions = await _searchService.getSearchSuggestions(query: query);
-      setState(() {
-        _suggestions = suggestions;
-        _showSuggestions = true;
-      });
-    } catch (e) {
-      print('Error loading suggestions: $e');
-    }
+    // Suggestions disabled for now
+    return;
   }
 
   void _onSearchChanged(String value) {
@@ -212,7 +197,7 @@ class _SearchScreenState extends State<SearchScreen>
             onChanged: _onSearchChanged,
             onSubmitted: _onSearchSubmitted,
             decoration: InputDecoration(
-              hintText: 'Tìm kiếm...',
+              hintText: 'Search...',
               hintStyle: TextStyle(color: Colors.grey[400]),
               prefixIcon: Icon(Icons.search, color: Colors.grey[600], size: 20),
               suffixIcon: _searchQuery.isNotEmpty
@@ -242,9 +227,9 @@ class _SearchScreenState extends State<SearchScreen>
                 unselectedLabelColor: Colors.grey,
                 indicatorColor: Colors.black,
                 tabs: const [
-                  Tab(text: 'Tất cả'),
-                  Tab(text: 'Người dùng'),
-                  Tab(text: 'Bài viết'),
+                  Tab(text: 'All'),
+                  Tab(text: 'Accounts'),
+                  Tab(text: 'Posts'),
                   Tab(text: 'Tags'),
                 ],
               )
@@ -269,7 +254,7 @@ class _SearchScreenState extends State<SearchScreen>
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Người dùng',
+              'Accounts',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -338,7 +323,7 @@ class _SearchScreenState extends State<SearchScreen>
         child: const Icon(Icons.tag, color: Colors.grey),
       ),
       title: Text('#${tag.name}'),
-      subtitle: Text('${tag.postsCount} bài viết'),
+      subtitle: Text('${tag.postsCount} posts'),
       onTap: () {
         _searchController.text = tag.name;
         _onSearchSubmitted(tag.name);
@@ -394,7 +379,7 @@ class _SearchScreenState extends State<SearchScreen>
             fontWeight: FontWeight.bold,
           ),
         ),
-        subtitle: Text('${tag.postsCount} bài viết'),
+        subtitle: Text('${tag.postsCount} posts'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () {
           _searchController.text = tag.name;
@@ -424,13 +409,13 @@ class _SearchScreenState extends State<SearchScreen>
     return ListView(
       children: [
         if (_userResults.isNotEmpty) ...[
-          _buildSectionHeader('Người dùng', () {
+          _buildSectionHeader('Accounts', () {
             _tabController.animateTo(1);
           }),
           ..._userResults.take(3).map((user) => _buildUserItem(user)),
         ],
         if (_postResults.isNotEmpty) ...[
-          _buildSectionHeader('Bài viết', () {
+          _buildSectionHeader('Posts', () {
             _tabController.animateTo(2);
           }),
           _buildPostGrid(_postResults.take(6).toList()),
@@ -445,7 +430,7 @@ class _SearchScreenState extends State<SearchScreen>
           const Center(
             child: Padding(
               padding: EdgeInsets.all(32),
-              child: Text('Không tìm thấy kết quả'),
+              child: Text('No results found'),
             ),
           ),
       ],
@@ -467,7 +452,7 @@ class _SearchScreenState extends State<SearchScreen>
           ),
           TextButton(
             onPressed: onSeeAll,
-            child: const Text('Xem tất cả'),
+            child: const Text('See all'),
           ),
         ],
       ),
@@ -527,7 +512,7 @@ class _SearchScreenState extends State<SearchScreen>
         children: [
           if (user.fullName != null) Text(user.fullName!),
           Text(
-            '${user.followersCount} người theo dõi',
+            '${user.followersCount} followers',
             style: TextStyle(color: Colors.grey[600], fontSize: 12),
           ),
         ],
@@ -562,7 +547,7 @@ class _SearchScreenState extends State<SearchScreen>
           ),
         ),
         child: Text(
-          user.isFollowing ? 'Đang theo dõi' : 'Theo dõi',
+          user.isFollowing ? 'Following' : 'Follow',
           style: const TextStyle(fontSize: 12),
         ),
       ),
@@ -576,7 +561,7 @@ class _SearchScreenState extends State<SearchScreen>
       
       if (token == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Vui lòng đăng nhập')),
+          const SnackBar(content: Text('Please login')),
         );
         return;
       }
@@ -622,13 +607,13 @@ class _SearchScreenState extends State<SearchScreen>
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(user.isFollowing ? 'Đã bỏ theo dõi' : 'Đã theo dõi'),
+            content: Text(user.isFollowing ? 'Unfollowed' : 'Followed'),
           ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
+        SnackBar(content: Text('Error: $e')),
       );
     }
   }
@@ -642,7 +627,7 @@ class _SearchScreenState extends State<SearchScreen>
         return false;
       },
       child: _postResults.isEmpty
-          ? const Center(child: Text('Không có bài viết'))
+          ? const Center(child: Text('No posts found'))
           : GridView.builder(
               padding: const EdgeInsets.all(2),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

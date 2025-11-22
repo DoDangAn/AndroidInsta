@@ -275,11 +275,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           children: [
             const Icon(Icons.error_outline, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            Text('Lỗi: $_error'),
+            Text('Error: $_error'),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadUserProfile,
-              child: const Text('Thử lại'),
+              child: const Text('Retry'),
             ),
           ],
         ),
