@@ -139,7 +139,7 @@ data class AdminTopPostDto(
     val caption: String?,
     val username: String,
     val userId: Long,
-    val likesCount: Int,
-    val commentsCount: Int,
+    val likesCount: Long,
+    val commentsCount: Long,
     val createdAt: LocalDateTime
 )
