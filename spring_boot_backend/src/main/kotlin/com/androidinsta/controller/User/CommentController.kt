@@ -37,7 +37,7 @@ class CommentController(
             parentCommentId = request.parentCommentId
         )
 
-        val repliesCount = commentService.getRepliesCount(comment.id)
+        val repliesCount = commentService.getRepliesCount(comment.id).toInt()
 
         val response = CommentResponse(
             id = comment.id,
@@ -64,7 +64,7 @@ class CommentController(
         val comments = commentService.getPostComments(postId)
 
         val responses = comments.map { comment ->
-            val repliesCount = commentService.getRepliesCount(comment.id)
+            val repliesCount = commentService.getRepliesCount(comment.id).toInt()
             
             CommentResponse(
                 id = comment.id,

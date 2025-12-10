@@ -26,17 +26,8 @@ data class SendMessageRequest(
     val messageType: String = "text"
 )
 
-data class ConversationDto(
-    val userId: Long,
-    val username: String,
-    val avatarUrl: String?,
-    val lastMessage: String?,
-    val lastMessageTime: LocalDateTime?,
-    val unreadCount: Long
-)
-
 /**
- * Extension function: Convert Message entity to MessageDto
+ * Extension function: Convert Message to MessageDto
  */
 fun Message.toDto(): MessageDto {
     return MessageDto(

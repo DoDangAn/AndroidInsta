@@ -59,7 +59,7 @@ class MessageService(
             messageId = savedMessage.id,
             senderId = senderId,
             receiverId = receiverId,
-            content = content
+            content = content ?: ""
         )
         
         // Gửi message qua WebSocket đến receiver
@@ -166,8 +166,7 @@ class MessageService(
         // Send Kafka event
         kafkaProducerService.sendMessageDeletedEvent(
             messageId = messageId,
-            userId = senderId,
-            receiverId = receiverId
+            userId = message.sender.id
         )
         
         messageRepository.delete(message)
