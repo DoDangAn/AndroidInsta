@@ -18,7 +18,7 @@ data class PostDto(
     val likeCount: Long = 0,
     val commentCount: Long = 0,
     val isLiked: Boolean = false,
-    val createdAt: LocalDateTime,
+    val createdAt: LocalDateTime?,
     val updatedAt: LocalDateTime?
 )
 

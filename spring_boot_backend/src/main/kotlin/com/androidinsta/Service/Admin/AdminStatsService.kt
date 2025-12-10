@@ -69,7 +69,8 @@ class AdminStatsService(
         val startDate = LocalDateTime.now().minusDays(days.toLong())
         
         val usersByDay = userRepository.findByCreatedAtAfter(startDate)
-            .groupBy { it.createdAt.toLocalDate() }
+            .filter { it.createdAt != null }
+            .groupBy { it.createdAt!!.toLocalDate() }
             .map { (date, users) ->
                 AdminTimeDataPoint(
                     date = date.toString(),
@@ -92,7 +93,8 @@ class AdminStatsService(
         val startDate = LocalDateTime.now().minusDays(days.toLong())
         
         val postsByDay = postRepository.findByCreatedAtAfter(startDate)
-            .groupBy { it.createdAt.toLocalDate() }
+            .filter { it.createdAt != null }
+            .groupBy { it.createdAt!!.toLocalDate() }
             .map { (date, posts) ->
                 AdminTimeDataPoint(
                     date = date.toString(),
