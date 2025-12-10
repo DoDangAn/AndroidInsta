@@ -27,11 +27,6 @@ data class UserSummaryDto(
     val avatarUrl: String?
 )
 
-data class MediaFileDto(
-    val fileUrl: String,
-    val fileType: String
-)
-
 /**
  * Extension function: Convert User to ProfileDto
  */

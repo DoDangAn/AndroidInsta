@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
+import java.time.LocalDateTime
 
 @Repository
 interface PostRepository : JpaRepository<Post, Long> {
@@ -77,4 +78,14 @@ interface PostRepository : JpaRepository<Post, Long> {
         ORDER BY p.createdAt DESC
     """)
     fun searchPosts(@Param("keyword") keyword: String, pageable: Pageable): Page<Post>
+    
+    /**
+     * Count posts created after a date
+     */
+    fun countByCreatedAtAfter(date: LocalDateTime): Long
+    
+    /**
+     * Find posts created after a date
+     */
+    fun findByCreatedAtAfter(date: LocalDateTime): List<Post>
 }

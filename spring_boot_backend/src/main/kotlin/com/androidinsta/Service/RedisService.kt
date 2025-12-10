@@ -84,6 +84,14 @@ class RedisService(
     }
 
     /**
+     * Generic get operation with type casting
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun <T> get(key: String, clazz: Class<T>): T? {
+        return redisTemplate.opsForValue().get(key) as? T
+    }
+
+    /**
      * Delete key
      */
     fun delete(key: String) {

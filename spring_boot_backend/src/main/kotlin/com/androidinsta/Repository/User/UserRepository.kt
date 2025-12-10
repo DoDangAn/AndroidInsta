@@ -4,6 +4,7 @@ import com.androidinsta.Model.User
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
+import java.time.LocalDateTime
 import java.util.Optional
 
 @Repository
@@ -27,4 +28,16 @@ interface UserRepository : JpaRepository<User, Long> {
     // Query custom - tìm kiếm theo username, email, hoặc fullName
     @Query("SELECT u FROM User u WHERE u.username LIKE %:keyword% OR u.email LIKE %:keyword% OR u.fullName LIKE %:keyword%")
     fun searchUsers(keyword: String): List<User>
+    
+    // Count by active status
+    fun countByIsActive(isActive: Boolean): Long
+    
+    // Count by verified status
+    fun countByIsVerified(isVerified: Boolean): Long
+    
+    // Count users created after a date
+    fun countByCreatedAtAfter(date: LocalDateTime): Long
+    
+    // Find users created after a date
+    fun findByCreatedAtAfter(date: LocalDateTime): List<User>
 }

@@ -62,5 +62,5 @@ interface CommentRepository : JpaRepository<Comment, Long> {
     /**
      * Đếm số replies của một comment
      */
-    fun countByParentCommentId(parentCommentId: Long): Int
+    fun countByParentCommentId(parentCommentId: Long): Long
 }

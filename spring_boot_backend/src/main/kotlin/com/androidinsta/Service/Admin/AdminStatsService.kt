@@ -2,9 +2,9 @@ package com.androidinsta.Service.Admin
 
 import com.androidinsta.Repository.User.UserRepository
 import com.androidinsta.Repository.User.PostRepository
-import com.androidinsta.Service.LikeRepository
-import com.androidinsta.Service.CommentRepository
-import com.androidinsta.Service.FollowRepository
+import com.androidinsta.Repository.User.LikeRepository
+import com.androidinsta.Repository.User.CommentRepository
+import com.androidinsta.Repository.User.FollowRepository
 import com.androidinsta.dto.*
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
