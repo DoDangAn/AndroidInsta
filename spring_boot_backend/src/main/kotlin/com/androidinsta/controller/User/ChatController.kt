@@ -22,6 +22,10 @@ class ChatController(
      * GET /api/chat/conversations - Lấy danh sách conversations
      */
     @GetMapping("/conversations")
+    @org.springframework.cache.annotation.Cacheable(
+        value = ["conversations"],
+        key = "#userId"
+    )
     fun getConversations(): ResponseEntity<ConversationsResponse> {
         val userId = SecurityUtil.getCurrentUserId()
             ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
@@ -76,6 +80,10 @@ class ChatController(
      * POST /api/chat/send - Gửi message
      */
     @PostMapping("/send")
+    @org.springframework.cache.annotation.CacheEvict(
+        value = ["conversations", "chatHistory"],
+        allEntries = true
+    )
     fun sendMessage(@RequestBody request: SendMessageRequest): ResponseEntity<MessageDto> {
         val senderId = SecurityUtil.getCurrentUserId()
             ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()

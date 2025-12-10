@@ -38,6 +38,9 @@ class LikeService(
 
         likeRepository.save(like)
 
+        // Invalidate cache
+        redisService.delete("like:count:$postId")
+
         // Send Kafka event
         kafkaProducerService.sendPostLikedEvent(postId, userId)
 
@@ -61,6 +64,13 @@ class LikeService(
         }
 
         likeRepository.deleteByPostIdAndUserId(postId, userId)
+        
+        // Invalidate cache
+        redisService.delete("like:count:$postId")
+        
+        // Send Kafka event for audit
+        kafkaProducerService.sendPostUnlikedEvent(postId, userId)
+        
         return true
     }
 
@@ -69,6 +79,12 @@ class LikeService(
     }
 
     fun getLikeCount(postId: Long): Long {
-        return likeRepository.countByPostId(postId)
+        val cacheKey = "like:count:$postId"
+        val cached = redisService.get(cacheKey, Long::class.java)
+        if (cached != null) return cached
+        
+        val count = likeRepository.countByPostId(postId)
+        redisService.set(cacheKey, count, java.time.Duration.ofMinutes(10))
+        return count
     }
 }

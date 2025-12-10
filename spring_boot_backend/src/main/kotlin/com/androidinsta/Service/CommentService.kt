@@ -16,7 +16,8 @@ class CommentService(
     private val userRepository: UserRepository,
     private val kafkaProducerService: KafkaProducerService,
     private val notificationService: NotificationService,
-    private val friendshipRepository: com.androidinsta.Repository.User.FriendshipRepository
+    private val friendshipRepository: com.androidinsta.Repository.User.FriendshipRepository,
+    private val redisService: RedisService
 ) {
 
     fun addComment(userId: Long, postId: Long, content: String, parentCommentId: Long? = null): Comment {
@@ -39,6 +40,12 @@ class CommentService(
         )
 
         val savedComment = commentRepository.save(comment)
+        
+        // Invalidate comment count cache
+        redisService.delete("comment:count:$postId")
+        parentCommentId?.let {
+            redisService.delete("replies:count:$it")
+        }
 
         // Send Kafka event
         kafkaProducerService.sendPostCommentedEvent(
@@ -83,6 +90,12 @@ class CommentService(
         if (comment.user.id != userId) {
             throw RuntimeException("You can only delete your own comments")
         }
+        
+        // Invalidate caches
+        redisService.delete("comment:count:${comment.post.id}")
+        comment.parentComment?.let {
+            redisService.delete("replies:count:${it.id}")
+        }
 
         commentRepository.delete(comment)
     }
@@ -97,10 +110,30 @@ class CommentService(
     }
 
     fun getCommentCount(postId: Long): Long {
-        return commentRepository.countByPostId(postId)
+        val cacheKey = "comment:count:$postId"
+        
+        val cached = redisService.get(cacheKey, Long::class.java)
+        if (cached != null) {
+            return cached
+        }
+        
+        val count = commentRepository.countByPostId(postId)
+        redisService.set(cacheKey, count, java.time.Duration.ofMinutes(10))
+        
+        return count
     }
 
     fun getRepliesCount(commentId: Long): Int {
-        return commentRepository.countByParentCommentId(commentId)
+        val cacheKey = "replies:count:$commentId"
+        
+        val cached = redisService.get(cacheKey, Int::class.java)
+        if (cached != null) {
+            return cached
+        }
+        
+        val count = commentRepository.countByParentCommentId(commentId)
+        redisService.set(cacheKey, count, java.time.Duration.ofMinutes(10))
+        
+        return count
     }
 }

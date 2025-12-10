@@ -15,7 +15,9 @@ import org.springframework.transaction.annotation.Transactional
 class MessageService(
     private val messageRepository: MessageRepository,
     private val userRepository: UserRepository,
-    private val messagingTemplate: SimpMessagingTemplate
+    private val messagingTemplate: SimpMessagingTemplate,
+    private val redisService: RedisService,
+    private val kafkaProducerService: KafkaProducerService
 ) {
     
     /**
@@ -45,6 +47,21 @@ class MessageService(
         
         val savedMessage = messageRepository.save(message)
         
+        // Invalidate caches
+        redisService.delete("conversation:$senderId")
+        redisService.delete("conversation:$receiverId")
+        redisService.delete("chat:history:$senderId:$receiverId:*")
+        redisService.delete("chat:history:$receiverId:$senderId:*")
+        redisService.delete("unread:messages:$receiverId:$senderId")
+        
+        // Send Kafka event
+        kafkaProducerService.sendMessageSentEvent(
+            messageId = savedMessage.id,
+            senderId = senderId,
+            receiverId = receiverId,
+            messageType = messageType.name
+        )
+        
         // Gửi message qua WebSocket đến receiver
         messagingTemplate.convertAndSendToUser(
             receiver.id.toString(),
@@ -59,26 +76,59 @@ class MessageService(
      * Lấy chat history với pagination
      */
     fun getChatHistory(userId: Long, partnerId: Long, pageable: Pageable): Page<Message> {
-        return messageRepository.findChatHistory(userId, partnerId, pageable)
+        val cacheKey = "chat:history:$userId:$partnerId:${pageable.pageNumber}"
+        
+        val cached = redisService.get(cacheKey, Page::class.java)
+        if (cached != null) {
+            @Suppress("UNCHECKED_CAST")
+            return cached as Page<Message>
+        }
+        
+        val result = messageRepository.findChatHistory(userId, partnerId, pageable)
+        redisService.set(cacheKey, result, java.time.Duration.ofMinutes(5))
+        
+        return result
     }
     
     /**
      * Lấy danh sách conversations
      */
     fun getConversations(userId: Long): List<Pair<Long, Message?>> {
+        val cacheKey = "conversation:$userId"
+        
+        val cached = redisService.get(cacheKey, List::class.java)
+        if (cached != null) {
+            @Suppress("UNCHECKED_CAST")
+            return cached as List<Pair<Long, Message?>>
+        }
+        
         val partnerIds = messageRepository.findChatPartners(userId)
         
-        return partnerIds.map { partnerId ->
+        val result = partnerIds.map { partnerId ->
             val lastMessage = messageRepository.findLastMessage(userId, partnerId)
             partnerId to lastMessage
         }.sortedByDescending { it.second?.createdAt }
+        
+        redisService.set(cacheKey, result, java.time.Duration.ofMinutes(5))
+        
+        return result
     }
     
     /**
      * Đếm unread messages từ một user
      */
     fun countUnreadMessages(receiverId: Long, senderId: Long): Long {
-        return messageRepository.countUnreadMessages(receiverId, senderId)
+        val cacheKey = "unread:messages:$receiverId:$senderId"
+        
+        val cached = redisService.get(cacheKey, Long::class.java)
+        if (cached != null) {
+            return cached
+        }
+        
+        val count = messageRepository.countUnreadMessages(receiverId, senderId)
+        redisService.set(cacheKey, count, java.time.Duration.ofMinutes(1))
+        
+        return count
     }
     
     /**
@@ -87,6 +137,9 @@ class MessageService(
     @Transactional
     fun markAsRead(receiverId: Long, senderId: Long) {
         messageRepository.markMessagesAsRead(receiverId, senderId)
+        
+        // Invalidate unread count cache
+        redisService.delete("unread:messages:$receiverId:$senderId")
     }
     
     /**
@@ -100,6 +153,22 @@ class MessageService(
         if (message.sender.id != userId) {
             throw RuntimeException("You can only delete your own messages")
         }
+        
+        val senderId = message.sender.id
+        val receiverId = message.receiver.id
+        
+        // Invalidate caches
+        redisService.delete("conversation:$senderId")
+        redisService.delete("conversation:$receiverId")
+        redisService.delete("chat:history:$senderId:$receiverId:*")
+        redisService.delete("chat:history:$receiverId:$senderId:*")
+        
+        // Send Kafka event
+        kafkaProducerService.sendMessageDeletedEvent(
+            messageId = messageId,
+            senderId = senderId,
+            receiverId = receiverId
+        )
         
         messageRepository.delete(message)
     }

@@ -18,6 +18,7 @@ class NotificationController(
     /**
      * Lấy danh sách notifications
      */
+    @org.springframework.cache.annotation.Cacheable(value = ["notifications"], key = "#userId + '_page_' + #page + '_size_' + #size")
     @GetMapping
     fun getNotifications(
         @RequestParam(defaultValue = "0") page: Int,
@@ -31,6 +32,7 @@ class NotificationController(
     /**
      * Lấy unread notifications
      */
+    @org.springframework.cache.annotation.Cacheable(value = ["unreadNotifications"], key = "#userId + '_page_' + #page + '_size_' + #size")
     @GetMapping("/unread")
     fun getUnreadNotifications(
         @RequestParam(defaultValue = "0") page: Int,
@@ -44,6 +46,7 @@ class NotificationController(
     /**
      * Đếm số unread notifications
      */
+    @org.springframework.cache.annotation.Cacheable(value = ["unreadCount"], key = "#userId")
     @GetMapping("/unread/count")
     fun getUnreadCount(): ResponseEntity<Map<String, Long>> {
         val userId = SecurityUtil.getCurrentUserId()
@@ -54,6 +57,7 @@ class NotificationController(
     /**
      * Đánh dấu notification là đã đọc
      */
+    @org.springframework.cache.annotation.CacheEvict(value = ["notifications", "unreadNotifications", "unreadCount"], allEntries = true)
     @PutMapping("/{id}/read")
     fun markAsRead(@PathVariable id: Long): ResponseEntity<Map<String, String>> {
         val userId = SecurityUtil.getCurrentUserId()
@@ -64,6 +68,7 @@ class NotificationController(
     /**
      * Đánh dấu tất cả là đã đọc
      */
+    @org.springframework.cache.annotation.CacheEvict(value = ["notifications", "unreadNotifications", "unreadCount"], allEntries = true)
     @PutMapping("/read-all")
     fun markAllAsRead(): ResponseEntity<Map<String, String>> {
         val userId = SecurityUtil.getCurrentUserId()
@@ -74,6 +79,7 @@ class NotificationController(
     /**
      * Xóa notification
      */
+    @org.springframework.cache.annotation.CacheEvict(value = ["notifications", "unreadNotifications", "unreadCount"], allEntries = true)
     @DeleteMapping("/{id}")
     fun deleteNotification(@PathVariable id: Long): ResponseEntity<Map<String, String>> {
         val userId = SecurityUtil.getCurrentUserId()

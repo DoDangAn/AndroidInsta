@@ -23,6 +23,7 @@ class ReelController(
     private val cloudinaryService: CloudinaryService
 ) {
 
+    @org.springframework.cache.annotation.CacheEvict(value = ["reels", "reelDetail", "feedPosts", "userPosts"], allEntries = true)
     @PostMapping("/upload")
     fun uploadReel(
         @RequestParam("video") videoFile: MultipartFile,
@@ -111,6 +112,7 @@ class ReelController(
         }
     }
 
+    @org.springframework.cache.annotation.Cacheable(value = ["reels"], key = "'page_' + #page + '_size_' + #size")
     @GetMapping
     fun getReels(
         @RequestParam(defaultValue = "0") page: Int,
@@ -140,6 +142,7 @@ class ReelController(
         )
     }
 
+    @org.springframework.cache.annotation.Cacheable(value = ["reelDetail"], key = "#id")
     @GetMapping("/{id}")
     fun getReelById(@PathVariable id: Long): ResponseEntity<PostResponse> {
         val post = postRepository.findById(id).orElseThrow()
@@ -163,6 +166,7 @@ class ReelController(
         )
     }
 
+    @org.springframework.cache.annotation.CacheEvict(value = ["reels", "reelDetail", "feedPosts", "userPosts"], allEntries = true)
     @DeleteMapping("/{id}")
     fun deleteReel(@PathVariable id: Long): ResponseEntity<Map<String, String>> {
         val currentUserId = SecurityUtil.getCurrentUserId()

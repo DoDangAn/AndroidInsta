@@ -77,6 +77,117 @@ class KafkaProducerService(
     }
 
     /**
+     * Send user unfollowed event
+     */
+    fun sendUserUnfollowedEvent(followerId: Long, followedId: Long) {
+        val event = mapOf(
+            "followerId" to followerId,
+            "followedId" to followedId,
+            "timestamp" to System.currentTimeMillis()
+        )
+        send("user-unfollowed", followerId.toString(), event)
+    }
+
+    /**
+     * Send post unliked event
+     */
+    fun sendPostUnlikedEvent(postId: Long, userId: Long) {
+        val event = mapOf(
+            "postId" to postId,
+            "userId" to userId,
+            "timestamp" to System.currentTimeMillis()
+        )
+        send("post-unliked", postId.toString(), event)
+    }
+
+    /**
+     * Send post deleted event
+     */
+    fun sendPostDeletedEvent(postId: Long, userId: Long) {
+        val event = mapOf(
+            "postId" to postId,
+            "userId" to userId,
+            "timestamp" to System.currentTimeMillis()
+        )
+        send("post-deleted", postId.toString(), event)
+    }
+
+    /**
+     * Send post updated event
+     */
+    fun sendPostUpdatedEvent(postId: Long, userId: Long) {
+        val event = mapOf(
+            "postId" to postId,
+            "userId" to userId,
+            "timestamp" to System.currentTimeMillis()
+        )
+        send("post-updated", postId.toString(), event)
+    }
+
+    /**
+     * Send message sent event
+     */
+    fun sendMessageSentEvent(messageId: Long, senderId: Long, receiverId: Long, content: String) {
+        val event = mapOf(
+            "messageId" to messageId,
+            "senderId" to senderId,
+            "receiverId" to receiverId,
+            "content" to content,
+            "timestamp" to System.currentTimeMillis()
+        )
+        send("message-sent", messageId.toString(), event)
+    }
+
+    /**
+     * Send message deleted event
+     */
+    fun sendMessageDeletedEvent(messageId: Long, userId: Long) {
+        val event = mapOf(
+            "messageId" to messageId,
+            "userId" to userId,
+            "timestamp" to System.currentTimeMillis()
+        )
+        send("message-deleted", messageId.toString(), event)
+    }
+
+    /**
+     * Send friend request accepted event
+     */
+    fun sendFriendAcceptEvent(userId: Long, friendId: Long) {
+        val event = mapOf(
+            "userId" to userId,
+            "friendId" to friendId,
+            "timestamp" to System.currentTimeMillis()
+        )
+        send("friend-accepted", userId.toString(), event)
+    }
+
+    /**
+     * Send password changed event
+     */
+    fun sendPasswordChangedEvent(userId: Long, username: String) {
+        val event = mapOf(
+            "userId" to userId,
+            "username" to username,
+            "timestamp" to System.currentTimeMillis()
+        )
+        send("password-changed", userId.toString(), event)
+    }
+
+    /**
+     * Send admin post deleted event
+     */
+    fun sendAdminPostDeletedEvent(postId: Long, userId: Long) {
+        val event = mapOf(
+            "postId" to postId,
+            "userId" to userId,
+            "deletedBy" to "ADMIN",
+            "timestamp" to System.currentTimeMillis()
+        )
+        send("admin-post-deleted", postId.toString(), event)
+    }
+
+    /**
      * Send notification event
      */
     fun sendNotificationEvent(userId: Long, title: String, message: String, type: String) {

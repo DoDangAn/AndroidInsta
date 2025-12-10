@@ -53,6 +53,8 @@ class FollowService(
         // Invalidate caches
         redisService.invalidateUserCache(followerId)
         redisService.invalidateUserCache(followedId)
+        redisService.delete("following:count:$followerId")
+        redisService.delete("followers:count:$followedId")
 
         return true
     }
@@ -67,6 +69,11 @@ class FollowService(
         // Invalidate caches
         redisService.invalidateUserCache(followerId)
         redisService.invalidateUserCache(followedId)
+        redisService.delete("following:count:$followerId")
+        redisService.delete("followers:count:$followedId")
+        
+        // Send Kafka event for audit
+        kafkaProducerService.sendUserUnfollowedEvent(followerId, followedId)
 
         return true
     }
@@ -76,11 +83,23 @@ class FollowService(
     }
 
     fun getFollowingCount(userId: Long): Long {
-        return followRepository.countByFollowerId(userId)
+        val cacheKey = "following:count:$userId"
+        val cached = redisService.get(cacheKey, Long::class.java)
+        if (cached != null) return cached
+        
+        val count = followRepository.countByFollowerId(userId)
+        redisService.set(cacheKey, count, java.time.Duration.ofMinutes(30))
+        return count
     }
 
     fun getFollowersCount(userId: Long): Long {
-        return followRepository.countByFollowedId(userId)
+        val cacheKey = "followers:count:$userId"
+        val cached = redisService.get(cacheKey, Long::class.java)
+        if (cached != null) return cached
+        
+        val count = followRepository.countByFollowedId(userId)
+        redisService.set(cacheKey, count, java.time.Duration.ofMinutes(30))
+        return count
     }
 
     fun getFollowers(userId: Long): List<com.androidinsta.Model.User> {

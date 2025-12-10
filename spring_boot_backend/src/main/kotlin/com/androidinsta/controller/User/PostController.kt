@@ -20,6 +20,7 @@ class PostController(
      * GET /api/posts/feed - Lấy feed posts
      * Hiển thị posts của người mình follow + posts public
      */
+    @org.springframework.cache.annotation.Cacheable(value = ["feedPosts"], key = "#userId + '_page_' + #page + '_size_' + #size")
     @GetMapping("/feed")
     fun getFeed(
         @RequestParam(defaultValue = "0") page: Int,
@@ -44,6 +45,7 @@ class PostController(
     /**
      * GET /api/posts/user/{userId} - Lấy posts của một user
      */
+    @org.springframework.cache.annotation.Cacheable(value = ["userPosts"], key = "#userId + '_' + (#currentUserId ?: 'guest') + '_page_' + #page + '_size_' + #size")
     @GetMapping("/user/{userId}")
     fun getUserPosts(
         @PathVariable userId: Long,
@@ -67,6 +69,7 @@ class PostController(
     /**
      * POST /api/posts - Tạo post mới
      */
+    @org.springframework.cache.annotation.CacheEvict(value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"], allEntries = true)
     @PostMapping
     fun createPost(@RequestBody request: CreatePostRequest): ResponseEntity<PostDto> {
         val userId = SecurityUtil.getCurrentUserId()
@@ -91,6 +94,7 @@ class PostController(
     /**
      * DELETE /api/posts/{postId} - Xóa post
      */
+    @org.springframework.cache.annotation.CacheEvict(value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"], allEntries = true)
     @DeleteMapping("/{postId}")
     fun deletePost(@PathVariable postId: Long): ResponseEntity<Unit> {
         val userId = SecurityUtil.getCurrentUserId()
@@ -103,6 +107,7 @@ class PostController(
     /**
      * PUT /api/posts/{postId} - Cập nhật post
      */
+    @org.springframework.cache.annotation.CacheEvict(value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"], allEntries = true)
     @PutMapping("/{postId}")
     fun updatePost(
         @PathVariable postId: Long,
@@ -124,16 +129,25 @@ class PostController(
     /**
      * GET /api/posts/{postId} - Lấy chi tiết một post
      */
+    @org.springframework.cache.annotation.Cacheable(value = ["postDetail"], key = "#postId + '_' + (#currentUserId ?: 'guest')")
     @GetMapping("/{postId}")
     fun getPost(@PathVariable postId: Long): ResponseEntity<PostDto> {
-        // TODO: Implement get post by ID with permission check
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build()
+        val currentUserId = SecurityUtil.getCurrentUserId()
+        
+        return try {
+            val post = postService.getPostById(postId, currentUserId)
+            ResponseEntity.ok(post.toDto(currentUserId))
+        } catch (e: RuntimeException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(null)
+        }
     }
     
     /**
      * GET /api/posts/advertise - Lấy quảng cáo posts
      * Không cần authentication, ai cũng xem được
      */
+    @org.springframework.cache.annotation.Cacheable(value = ["advertisePosts"], key = "'public_page_' + #page + '_size_' + #size")
     @GetMapping("/advertise")
     fun getAdvertisePosts(
         @RequestParam(defaultValue = "0") page: Int,
@@ -156,6 +170,7 @@ class PostController(
     /**
      * POST /api/posts/{postId}/like - Like a post
      */
+    @org.springframework.cache.annotation.CacheEvict(value = ["feedPosts", "userPosts"], allEntries = true)
     @PostMapping("/{postId}/like")
     fun likePost(@PathVariable postId: Long): ResponseEntity<Map<String, Any>> {
         val userId = SecurityUtil.getCurrentUserId()
@@ -171,6 +186,7 @@ class PostController(
     /**
      * DELETE /api/posts/{postId}/like - Unlike a post
      */
+    @org.springframework.cache.annotation.CacheEvict(value = ["feedPosts", "userPosts"], allEntries = true)
     @DeleteMapping("/{postId}/like")
     fun unlikePost(@PathVariable postId: Long): ResponseEntity<Map<String, Any>> {
         val userId = SecurityUtil.getCurrentUserId()

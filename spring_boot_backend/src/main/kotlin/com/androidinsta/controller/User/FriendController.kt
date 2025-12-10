@@ -28,6 +28,10 @@ class FriendController(
 
     // Lấy friend requests đã nhận
     @GetMapping("/requests/received")
+    @org.springframework.cache.annotation.Cacheable(
+        value = ["friendRequests"],
+        key = "'received_' + #userId + '_page_' + #page"
+    )
     fun getReceivedFriendRequests(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int
@@ -60,6 +64,10 @@ class FriendController(
 
     // Chấp nhận friend request
     @PutMapping("/requests/{requestId}/accept")
+    @org.springframework.cache.annotation.CacheEvict(
+        value = ["friendRequests", "friendsList"],
+        allEntries = true
+    )
     fun acceptFriendRequest(
         @PathVariable requestId: Long
     ): ResponseEntity<FriendRequestResponse> {

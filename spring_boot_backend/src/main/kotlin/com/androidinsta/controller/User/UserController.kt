@@ -60,6 +60,7 @@ class UserController(
     }
 
     @GetMapping("/{userId}")
+    @org.springframework.cache.annotation.Cacheable(value = ["userProfile"], key = "#userId")
     fun getUserById(@PathVariable userId: Long): ResponseEntity<*> {
         return try {
             val user = userRepository.findById(userId)

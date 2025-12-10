@@ -20,13 +20,22 @@ class SearchService(
     private val tagRepository: TagRepository,
     private val followRepository: FollowRepository,
     private val likeRepository: LikeRepository,
-    private val commentRepository: CommentRepository
+    private val commentRepository: CommentRepository,
+    private val redisService: RedisService
 ) {
 
     /**
      * Tìm kiếm users
      */
     fun searchUsers(keyword: String, pageable: Pageable, currentUserId: Long? = null): Page<UserSearchResult> {
+        val cacheKey = "search:users:$keyword:${pageable.pageNumber}:${currentUserId ?: "guest"}"
+        
+        val cached = redisService.get(cacheKey, Page::class.java)
+        if (cached != null) {
+            @Suppress("UNCHECKED_CAST")
+            return cached as Page<UserSearchResult>
+        }
+        
         val users = userRepository.searchUsers(keyword)
         
         val results = users.map { user ->
@@ -53,11 +62,16 @@ class SearchService(
         val end = minOf(start + pageable.pageSize, results.size)
         val pageContent = if (start < results.size) results.subList(start, end) else emptyList()
         
-        return org.springframework.data.domain.PageImpl(
+        val result = org.springframework.data.domain.PageImpl(
             pageContent,
             pageable,
             results.size.toLong()
         )
+        
+        // Cache result for 5 minutes
+        redisService.set(cacheKey, result, java.time.Duration.ofMinutes(5))
+        
+        return result
     }
 
     /**

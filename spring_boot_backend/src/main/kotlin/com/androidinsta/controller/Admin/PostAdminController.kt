@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.RequestParam
 @RequestMapping("/api/admin/posts")
 class PostAdminController(private val postAdminService: PostAdminService) {
 
+    @org.springframework.cache.annotation.Cacheable(value = ["adminAllPosts"], key = "'all'")
     @GetMapping
     fun getAllPosts(): List<Post> = postAdminService.getAllPosts()
 
+    @org.springframework.cache.annotation.Cacheable(value = ["adminSearchPosts"], key = "#keyword + '_page_' + #page + '_size_' + #size + '_sort_' + #sortBy + '_' + #direction")
     @GetMapping("/search")
     fun searchPosts(
         @RequestParam(required = false, defaultValue = "") keyword: String,
@@ -28,6 +30,7 @@ class PostAdminController(private val postAdminService: PostAdminService) {
         return postAdminService.searchPosts(keyword, pageable)
     }
 
+    @org.springframework.cache.annotation.CacheEvict(value = ["adminAllPosts", "adminSearchPosts", "feedPosts", "userPosts"], allEntries = true)
     @DeleteMapping("/{postId}")
     fun deletePost(@PathVariable postId: Long) = postAdminService.deletePost(postId)
 

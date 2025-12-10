@@ -225,8 +225,14 @@ class AuthService(
 
         userRepository.save(updatedUser)
 
+        // Send Kafka event for audit and security monitoring
+        kafkaProducerService.sendPasswordChangedEvent(userId, user.username)
+
         // Revoke tất cả refresh tokens để force login lại
         refreshTokenRepository.revokeAllUserTokens(user)
+        
+        // Invalidate user cache
+        redisService.invalidateUserCache(userId)
     }
 
     private fun generateTokens(user: User): JwtResponse {

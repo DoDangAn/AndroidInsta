@@ -21,7 +21,8 @@ class NotificationService(
     private val notificationRepository: NotificationRepository,
     private val userRepository: UserRepository,
     private val kafkaTemplate: KafkaTemplate<String, NotificationEvent>,
-    private val messagingTemplate: SimpMessagingTemplate
+    private val messagingTemplate: SimpMessagingTemplate,
+    private val redisService: RedisService
 ) {
 
     companion object {
@@ -72,6 +73,9 @@ class NotificationService(
 
             val saved = notificationRepository.save(notification)
 
+            // Invalidate unread count cache
+            redisService.delete("notification:unread:count:${event.receiverId}")
+
             // Gửi real-time notification qua WebSocket
             val response = toNotificationResponse(saved)
             messagingTemplate.convertAndSendToUser(
@@ -104,7 +108,13 @@ class NotificationService(
      * Đếm unread notifications
      */
     fun getUnreadCount(userId: Long): Long {
-        return notificationRepository.countByReceiverIdAndIsReadFalse(userId)
+        val cacheKey = "notification:unread:count:$userId"
+        val cached = redisService.get(cacheKey, Long::class.java)
+        if (cached != null) return cached
+        
+        val count = notificationRepository.countByReceiverIdAndIsReadFalse(userId)
+        redisService.set(cacheKey, count, java.time.Duration.ofMinutes(1))
+        return count
     }
 
     /**
@@ -112,6 +122,8 @@ class NotificationService(
      */
     fun markAsRead(notificationId: Long, userId: Long) {
         notificationRepository.markAsRead(notificationId, userId)
+        // Invalidate cache
+        redisService.delete("notification:unread:count:$userId")
     }
 
     /**
@@ -119,6 +131,8 @@ class NotificationService(
      */
     fun markAllAsRead(userId: Long) {
         notificationRepository.markAllAsRead(userId)
+        // Invalidate cache
+        redisService.delete("notification:unread:count:$userId")
     }
 
     /**
@@ -128,6 +142,10 @@ class NotificationService(
         val notification = notificationRepository.findById(notificationId).orElse(null)
         if (notification?.receiver?.id == userId) {
             notificationRepository.delete(notification)
+            // Invalidate cache if notification was unread
+            if (!notification.isRead) {
+                redisService.delete("notification:unread:count:$userId")
+            }
         }
     }
 

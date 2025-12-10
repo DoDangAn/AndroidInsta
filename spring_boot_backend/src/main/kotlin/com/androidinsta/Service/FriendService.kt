@@ -16,7 +16,9 @@ class FriendService(
     private val friendRequestRepository: FriendRequestRepository,
     private val friendshipRepository: FriendshipRepository,
     private val userRepository: UserRepository,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val redisService: RedisService,
+    private val kafkaProducerService: KafkaProducerService
 ) {
 
     // Gửi friend request
@@ -51,6 +53,9 @@ class FriendService(
             status = FriendRequestStatus.PENDING
         )
         val saved = friendRequestRepository.save(friendRequest)
+        
+        // Invalidate pending requests count cache
+        redisService.delete("friend:pending:count:$receiverId")
 
         // Note: Database doesn't support FRIEND_REQUEST notification type
         // Notification feature can be added later if database schema is updated
@@ -88,6 +93,20 @@ class FriendService(
         )
         friendshipRepository.save(friendship1)
         friendshipRepository.save(friendship2)
+        
+        // Invalidate caches
+        redisService.delete("friend:pending:count:$userId")
+        redisService.delete("friends:count:${request.sender.id}")
+        redisService.delete("friends:count:${request.receiver.id}")
+        redisService.invalidateUserCache(request.sender.id)
+        redisService.invalidateUserCache(request.receiver.id)
+        
+        // Send Kafka event
+        kafkaProducerService.sendFriendAcceptEvent(
+            requestId = requestId,
+            userId1 = request.sender.id,
+            userId2 = request.receiver.id
+        )
 
         // Note: Database doesn't support FRIEND_ACCEPT notification type
         // Notification feature can be added later if database schema is updated
@@ -112,6 +131,9 @@ class FriendService(
         request.status = FriendRequestStatus.REJECTED
         request.respondedAt = LocalDateTime.now()
         val saved = friendRequestRepository.save(request)
+        
+        // Invalidate pending requests count cache
+        redisService.delete("friend:pending:count:$userId")
 
         return toFriendRequestResponse(saved)
     }
@@ -147,6 +169,12 @@ class FriendService(
         // Xóa cả 2 chiều
         friendshipRepository.deleteFriendship(userId, friendId)
         friendshipRepository.deleteFriendship(friendId, userId)
+        
+        // Invalidate caches
+        redisService.delete("friends:count:$userId")
+        redisService.delete("friends:count:$friendId")
+        redisService.invalidateUserCache(userId)
+        redisService.invalidateUserCache(friendId)
     }
 
     // Lấy danh sách friend requests đã nhận
@@ -163,7 +191,17 @@ class FriendService(
 
     // Đếm pending requests
     fun getPendingRequestsCount(userId: Long): Long {
-        return friendRequestRepository.countByReceiverIdAndStatus(userId, FriendRequestStatus.PENDING)
+        val cacheKey = "friend:pending:count:$userId"
+        
+        val cached = redisService.get(cacheKey, Long::class.java)
+        if (cached != null) {
+            return cached
+        }
+        
+        val count = friendRequestRepository.countByReceiverIdAndStatus(userId, FriendRequestStatus.PENDING)
+        redisService.set(cacheKey, count, java.time.Duration.ofMinutes(5))
+        
+        return count
     }
 
     // Lấy danh sách bạn bè
@@ -194,7 +232,17 @@ class FriendService(
 
     // Đếm số bạn bè
     fun getFriendsCount(userId: Long): Long {
-        return friendshipRepository.countByUserId(userId)
+        val cacheKey = "friends:count:$userId"
+        
+        val cached = redisService.get(cacheKey, Long::class.java)
+        if (cached != null) {
+            return cached
+        }
+        
+        val count = friendshipRepository.countByUserId(userId)
+        redisService.set(cacheKey, count, java.time.Duration.ofMinutes(30))
+        
+        return count
     }
 
     // Lấy mutual friends

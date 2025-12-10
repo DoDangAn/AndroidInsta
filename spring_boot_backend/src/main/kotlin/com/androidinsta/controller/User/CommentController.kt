@@ -18,6 +18,7 @@ class CommentController(
      * Thêm comment hoặc reply comment
      * POST /api/posts/{postId}/comments
      */
+    @org.springframework.cache.annotation.CacheEvict(value = ["postComments", "commentReplies", "commentCount"], allEntries = true)
     @PostMapping
     fun addComment(
         @PathVariable postId: Long,
@@ -57,6 +58,7 @@ class CommentController(
      * Lấy danh sách comments của post (chỉ comments gốc)
      * GET /api/posts/{postId}/comments
      */
+    @org.springframework.cache.annotation.Cacheable(value = ["postComments"], key = "#postId")
     @GetMapping
     fun getPostComments(@PathVariable postId: Long): ResponseEntity<List<CommentResponse>> {
         val comments = commentService.getPostComments(postId)
@@ -84,6 +86,7 @@ class CommentController(
      * Lấy replies của một comment
      * GET /api/posts/{postId}/comments/{commentId}/replies
      */
+    @org.springframework.cache.annotation.Cacheable(value = ["commentReplies"], key = "#commentId")
     @GetMapping("/{commentId}/replies")
     fun getCommentReplies(
         @PathVariable postId: Long,
@@ -112,6 +115,7 @@ class CommentController(
      * Xóa comment
      * DELETE /api/posts/{postId}/comments/{commentId}
      */
+    @org.springframework.cache.annotation.CacheEvict(value = ["postComments", "commentReplies", "commentCount"], allEntries = true)
     @DeleteMapping("/{commentId}")
     fun deleteComment(
         @PathVariable postId: Long,
@@ -132,6 +136,7 @@ class CommentController(
      * Lấy số lượng comments của post
      * GET /api/posts/{postId}/comments/count
      */
+    @org.springframework.cache.annotation.Cacheable(value = ["commentCount"], key = "#postId")
     @GetMapping("/count")
     fun getCommentCount(@PathVariable postId: Long): ResponseEntity<Map<String, Long>> {
         val count = commentService.getCommentCount(postId)

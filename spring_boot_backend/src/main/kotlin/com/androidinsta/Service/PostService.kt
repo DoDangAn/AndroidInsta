@@ -26,6 +26,13 @@ class PostService(
      * Lấy feed posts cho user: bao gồm posts của người mình follow + posts public
      */
     fun getFeedPosts(userId: Long, pageable: Pageable): Page<Post> {
+        val cacheKey = "feed:posts:$userId:${pageable.pageNumber}:${pageable.pageSize}"
+        val cached = redisService.get(cacheKey)
+        if (cached != null && cached is Page<*>) {
+            @Suppress("UNCHECKED_CAST")
+            return cached as Page<Post>
+        }
+        
         val user = userRepository.findById(userId)
             .orElseThrow { RuntimeException("User not found") }
         
@@ -36,16 +43,25 @@ class PostService(
         followedUserIds.add(userId)
         
         // Lấy posts: từ người follow HOẶC posts public
-        return postRepository.findFeedPosts(followedUserIds, pageable)
+        val result = postRepository.findFeedPosts(followedUserIds, pageable)
+        redisService.set(cacheKey, result, java.time.Duration.ofMinutes(5))
+        return result
     }
     
     /**
      * Lấy posts của một user cụ thể
      */
     fun getUserPosts(userId: Long, currentUserId: Long?, pageable: Pageable): Page<Post> {
+        val cacheKey = "user:posts:$userId:${currentUserId ?: "guest"}:${pageable.pageNumber}:${pageable.pageSize}"
+        val cached = redisService.get(cacheKey)
+        if (cached != null && cached is Page<*>) {
+            @Suppress("UNCHECKED_CAST")
+            return cached as Page<Post>
+        }
+        
         // Nếu xem posts của người khác, chỉ hiển thị PUBLIC
         // Nếu xem posts của chính mình, hiển thị tất cả
-        return if (currentUserId != null && currentUserId == userId) {
+        val result = if (currentUserId != null && currentUserId == userId) {
             postRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
         } else {
             postRepository.findByUserIdAndVisibilityOrderByCreatedAtDesc(
@@ -54,6 +70,9 @@ class PostService(
                 pageable
             )
         }
+        
+        redisService.set(cacheKey, result, java.time.Duration.ofMinutes(10))
+        return result
     }
     
     /**
@@ -108,6 +127,14 @@ class PostService(
         }
         
         postRepository.delete(post)
+        
+        // Send Kafka event for audit
+        kafkaProducerService.sendPostDeletedEvent(postId, userId)
+        
+        // Invalidate caches
+        redisService.invalidateUserCache(userId)
+        redisService.delete("feed:posts:*")
+        redisService.delete("user:posts:$userId:*")
     }
 
     /**
@@ -130,7 +157,17 @@ class PostService(
             post.visibility = visibility
         }
         
-        return postRepository.save(post)
+        val updated = postRepository.save(post)
+        
+        // Send Kafka event for audit
+        kafkaProducerService.sendPostUpdatedEvent(postId, userId)
+        
+        // Invalidate caches
+        redisService.invalidateUserCache(userId)
+        redisService.delete("feed:posts:*")
+        redisService.delete("user:posts:$userId:*")
+        
+        return updated
     }
     
     /**
@@ -138,5 +175,44 @@ class PostService(
      */
     fun getAdvertisePosts(pageable: Pageable): Page<Post> {
         return postRepository.findByVisibilityOrderByCreatedAtDesc(Visibility.PUBLIC, pageable)
+    }
+    
+    /**
+     * Lấy một post theo ID với permission check
+     */
+    fun getPostById(postId: Long, currentUserId: Long?): Post {
+        val cacheKey = "post:detail:$postId:${currentUserId ?: "guest"}"
+        val cached = redisService.get(cacheKey)
+        if (cached != null && cached is Post) {
+            return cached
+        }
+        
+        val post = postRepository.findById(postId)
+            .orElseThrow { RuntimeException("Post not found") }
+        
+        // Permission check
+        when (post.visibility) {
+            Visibility.PUBLIC, Visibility.ADVERTISE -> {
+                // Ai cũng xem được
+            }
+            Visibility.PRIVATE -> {
+                // Chỉ chủ post xem được
+                if (currentUserId == null || currentUserId != post.user.id) {
+                    throw RuntimeException("You don't have permission to view this post")
+                }
+            }
+            Visibility.FRIENDS_ONLY -> {
+                // Chỉ bạn bè mới xem được
+                if (currentUserId == null) {
+                    throw RuntimeException("You must be logged in to view this post")
+                }
+                if (currentUserId != post.user.id && !friendService.areFriends(currentUserId, post.user.id)) {
+                    throw RuntimeException("Only friends can view this post")
+                }
+            }
+        }
+        
+        redisService.set(cacheKey, post, java.time.Duration.ofMinutes(10))
+        return post
     }
 }

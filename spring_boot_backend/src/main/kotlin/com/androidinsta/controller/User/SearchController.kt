@@ -19,6 +19,10 @@ class SearchController(
      * GET /api/search/users?keyword=john&page=0&size=20
      */
     @GetMapping("/users")
+    @org.springframework.cache.annotation.Cacheable(
+        value = ["searchUsers"],
+        key = "#keyword + '_page_' + #page + '_size_' + #size"
+    )
     fun searchUsers(
         @RequestParam keyword: String,
         @RequestParam(defaultValue = "0") page: Int,
