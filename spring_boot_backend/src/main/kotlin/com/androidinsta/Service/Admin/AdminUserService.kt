@@ -2,10 +2,10 @@ package com.androidinsta.Service.Admin
 
 import com.androidinsta.Model.User
 import com.androidinsta.Repository.User.UserRepository
-import com.androidinsta.Service.FollowRepository
+import com.androidinsta.Repository.User.FollowRepository
 import com.androidinsta.Repository.User.PostRepository
-import com.androidinsta.Service.LikeRepository
-import com.androidinsta.Service.CommentRepository
+import com.androidinsta.Repository.User.LikeRepository
+import com.androidinsta.Repository.User.CommentRepository
 import com.androidinsta.dto.AdminUserStatsDto
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable

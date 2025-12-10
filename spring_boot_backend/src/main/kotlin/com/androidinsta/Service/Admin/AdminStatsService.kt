@@ -191,7 +191,7 @@ class AdminStatsService(
                             fullName = user.fullName,
                             avatarUrl = user.avatarUrl,
                             isVerified = user.isVerified,
-                            count = postRepository.countByUserId(user.id),
+                            count = user.posts.size.toLong(),
                             type = "posts"
                         )
                     }
@@ -201,8 +201,7 @@ class AdminStatsService(
             "likes" -> {
                 userRepository.findAll()
                     .map { user ->
-                        val userPosts = postRepository.findByUserId(user.id)
-                        val totalLikes = userPosts.sumOf { it.likesCount.toLong() }
+                        val totalLikes = user.posts.sumOf { it.likes.size.toLong() }
                         AdminTopUserDto(
                             id = user.id,
                             username = user.username,
@@ -234,9 +233,9 @@ class AdminStatsService(
         
         val posts = postRepository.findAll()
         
-        return when (type.lowercase()) {
+        val result = when (type.lowercase()) {
             "likes" -> {
-                posts.sortedByDescending { it.likesCount }
+                posts.sortedByDescending { it.likes.size }
                     .take(limit)
                     .map { post ->
                         AdminTopPostDto(
@@ -244,14 +243,14 @@ class AdminStatsService(
                             caption = post.caption,
                             username = post.user.username,
                             userId = post.user.id,
-                            likesCount = post.likesCount,
-                            commentsCount = post.commentsCount,
-                            createdAt = post.createdAt
+                            likesCount = post.likes.size.toLong(),
+                            commentsCount = post.comments.size.toLong(),
+                            createdAt = post.createdAt ?: java.time.LocalDateTime.now()
                         )
                     }
             }
             "comments" -> {
-                posts.sortedByDescending { it.commentsCount }
+                posts.sortedByDescending { it.comments.size }
                     .take(limit)
                     .map { post ->
                         AdminTopPostDto(
@@ -259,9 +258,9 @@ class AdminStatsService(
                             caption = post.caption,
                             username = post.user.username,
                             userId = post.user.id,
-                            likesCount = post.likesCount,
-                            commentsCount = post.commentsCount,
-                            createdAt = post.createdAt
+                            likesCount = post.likes.size.toLong(),
+                            commentsCount = post.comments.size.toLong(),
+                            createdAt = post.createdAt ?: java.time.LocalDateTime.now()
                         )
                     }
             }
