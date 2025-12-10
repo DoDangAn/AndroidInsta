@@ -163,16 +163,15 @@ class AdminUserService(
     fun getUserStats(userId: Long): AdminUserStatsDto {
         val user = getUserById(userId)
         
-        val postsCount = postRepository.countByUserId(userId)
+        val postsCount = user.posts.size.toLong()
         val followersCount = followRepository.countByFollowedId(userId)
         val followingCount = followRepository.countByFollowerId(userId)
-        val likesGivenCount = likeRepository.countByUserId(userId)
-        val commentsGivenCount = commentRepository.countByUserId(userId)
+        val likesGivenCount = user.likes.size.toLong()
+        val commentsGivenCount = user.comments.size.toLong()
         
         // Count likes received on user's posts
-        val userPosts = postRepository.findByUserId(userId)
-        val likesReceivedCount = userPosts.sumOf { it.likesCount.toLong() }
-        val commentsReceivedCount = userPosts.sumOf { it.commentsCount.toLong() }
+        val likesReceivedCount = user.posts.sumOf { it.likes.size.toLong() }
+        val commentsReceivedCount = user.posts.sumOf { it.comments.size.toLong() }
         
         return AdminUserStatsDto(
             userId = user.id,

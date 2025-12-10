@@ -201,15 +201,6 @@ class PostService(
                     throw RuntimeException("You don't have permission to view this post")
                 }
             }
-            Visibility.FRIENDS_ONLY -> {
-                // Chỉ bạn bè mới xem được
-                if (currentUserId == null) {
-                    throw RuntimeException("You must be logged in to view this post")
-                }
-                if (currentUserId != post.user.id && !friendService.areFriends(currentUserId, post.user.id)) {
-                    throw RuntimeException("Only friends can view this post")
-                }
-            }
         }
         
         redisService.set(cacheKey, post, java.time.Duration.ofMinutes(10))

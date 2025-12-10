@@ -1,6 +1,8 @@
 package com.androidinsta.Repository.User
 
 import com.androidinsta.Model.User
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
@@ -28,6 +30,13 @@ interface UserRepository : JpaRepository<User, Long> {
     // Query custom - tìm kiếm theo username, email, hoặc fullName
     @Query("SELECT u FROM User u WHERE u.username LIKE %:keyword% OR u.email LIKE %:keyword% OR u.fullName LIKE %:keyword%")
     fun searchUsers(keyword: String): List<User>
+    
+    // Search with pagination
+    fun findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+        username: String,
+        email: String,
+        pageable: Pageable
+    ): Page<User>
     
     // Count by active status
     fun countByIsActive(isActive: Boolean): Long

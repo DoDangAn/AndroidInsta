@@ -123,10 +123,10 @@ class CommentService(
         return count
     }
 
-    fun getRepliesCount(commentId: Long): Int {
+    fun getRepliesCount(commentId: Long): Long {
         val cacheKey = "replies:count:$commentId"
         
-        val cached = redisService.get(cacheKey, Int::class.java)
+        val cached = redisService.get(cacheKey, Long::class.java)
         if (cached != null) {
             return cached
         }
