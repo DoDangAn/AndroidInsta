@@ -103,9 +103,8 @@ class FriendService(
         
         // Send Kafka event
         kafkaProducerService.sendFriendAcceptEvent(
-            requestId = requestId,
-            userId1 = request.sender.id,
-            userId2 = request.receiver.id
+            userId = request.sender.id,
+            friendId = request.receiver.id
         )
 
         // Note: Database doesn't support FRIEND_ACCEPT notification type

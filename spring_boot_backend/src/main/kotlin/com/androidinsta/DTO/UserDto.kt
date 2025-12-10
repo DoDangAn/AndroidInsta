@@ -25,6 +25,7 @@ data class UserResponse(
  * Update user request
  */
 data class UpdateUserRequest(
+    val email: String?,
     val fullName: String?,
     val bio: String?,
     val avatarUrl: String?

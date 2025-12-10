@@ -82,16 +82,15 @@ class MessageController(
             
             val conversationDtos = conversations.mapNotNull { (partnerId, lastMessage) ->
                 val partner = userRepository.findById(partnerId).orElse(null) ?: return@mapNotNull null
-                val unreadCount = messageService.countUnreadMessages(userId, partnerId).toInt()
+                val unreadCount = messageService.countUnreadMessages(userId, partnerId)
                 
                 ConversationDto(
-                    user = UserSummaryDto(
-                        id = partner.id,
-                        username = partner.username,
-                        fullName = partner.fullName,
-                        avatarUrl = partner.avatarUrl
-                    ),
-                    lastMessage = lastMessage?.toDto(),
+                    userId = partner.id,
+                    username = partner.username,
+                    avatarUrl = partner.avatarUrl,
+                    fullName = partner.fullName,
+                    lastMessage = lastMessage?.content,
+                    lastMessageTime = lastMessage?.createdAt,
                     unreadCount = unreadCount
                 )
             }

@@ -29,18 +29,7 @@ class UserController(
             val user = userRepository.findById(userId)
                 .orElseThrow { RuntimeException("User not found") }
 
-            val userResponse = UserResponse(
-                id = user.id,
-                username = user.username,
-                email = user.email,
-                fullName = user.fullName,
-                bio = user.bio,
-                avatarUrl = user.avatarUrl,
-                isVerified = user.isVerified,
-                isActive = user.isActive,
-                createdAt = user.createdAt,
-                updatedAt = user.updatedAt
-            )
+            val userResponse = user.toResponse()
 
             ResponseEntity.ok(
                 mapOf(
@@ -66,18 +55,7 @@ class UserController(
             val user = userRepository.findById(userId)
                 .orElseThrow { RuntimeException("User not found") }
 
-            val userResponse = UserResponse(
-                id = user.id,
-                username = user.username,
-                email = user.email,
-                fullName = user.fullName,
-                bio = user.bio,
-                avatarUrl = user.avatarUrl,
-                isVerified = user.isVerified,
-                isActive = user.isActive,
-                createdAt = user.createdAt,
-                updatedAt = user.updatedAt
-            )
+            val userResponse = user.toResponse()
 
             ResponseEntity.ok(
                 mapOf(
@@ -101,15 +79,7 @@ class UserController(
         return try {
             val users = userRepository.searchUsers(keyword)
 
-            val userResponses = users.map { user ->
-                UserResponse(
-                    id = user.id,
-                    username = user.username,
-                    email = user.email,
-                    createdAt = user.createdAt,
-                    updatedAt = user.updatedAt
-                )
-            }
+            val userResponses = users.map { it.toResponse() }
 
             ResponseEntity.ok(
                 mapOf(
@@ -183,20 +153,7 @@ class UserController(
     fun getFollowers(@PathVariable userId: Long): ResponseEntity<*> {
         return try {
             val followers = followService.getFollowers(userId)
-            val response = followers.map { user ->
-                UserResponse(
-                    id = user.id,
-                    username = user.username,
-                    email = user.email,
-                    fullName = user.fullName,
-                    bio = user.bio,
-                    avatarUrl = user.avatarUrl,
-                    isVerified = user.isVerified,
-                    isActive = user.isActive,
-                    createdAt = user.createdAt,
-                    updatedAt = user.updatedAt
-                )
-            }
+            val response = followers.map { it.toResponse() }
             ResponseEntity.ok(mapOf("success" to true, "data" to response))
         } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf("success" to false, "message" to e.message))
@@ -210,20 +167,7 @@ class UserController(
     fun getFollowing(@PathVariable userId: Long): ResponseEntity<*> {
         return try {
             val following = followService.getFollowing(userId)
-            val response = following.map { user ->
-                UserResponse(
-                    id = user.id,
-                    username = user.username,
-                    email = user.email,
-                    fullName = user.fullName,
-                    bio = user.bio,
-                    avatarUrl = user.avatarUrl,
-                    isVerified = user.isVerified,
-                    isActive = user.isActive,
-                    createdAt = user.createdAt,
-                    updatedAt = user.updatedAt
-                )
-            }
+            val response = following.map { it.toResponse() }
             ResponseEntity.ok(mapOf("success" to true, "data" to response))
         } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf("success" to false, "message" to e.message))
@@ -254,18 +198,7 @@ class UserController(
             // Save updated user
             val savedUser = userRepository.save(updatedUser)
 
-            val userResponse = UserResponse(
-                id = savedUser.id,
-                username = savedUser.username,
-                email = savedUser.email,
-                fullName = savedUser.fullName,
-                bio = savedUser.bio,
-                avatarUrl = savedUser.avatarUrl,
-                isVerified = savedUser.isVerified,
-                isActive = savedUser.isActive,
-                createdAt = savedUser.createdAt,
-                updatedAt = savedUser.updatedAt
-            )
+            val userResponse = savedUser.toResponse()
 
             ResponseEntity.ok(
                 mapOf(

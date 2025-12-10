@@ -34,14 +34,13 @@ class ChatController(
             val partner = userRepository.findById(partnerId).orElse(null) ?: return@mapNotNull null
             
             ConversationDto(
-                user = UserSummaryDto(
-                    id = partner.id,
-                    username = partner.username,
-                    fullName = partner.fullName,
-                    avatarUrl = partner.avatarUrl
-                ),
-                lastMessage = lastMessage?.toDto(),
-                unreadCount = messageService.countUnreadMessages(userId, partnerId).toInt()
+                userId = partner.id,
+                username = partner.username,
+                avatarUrl = partner.avatarUrl,
+                fullName = partner.fullName,
+                lastMessage = lastMessage?.content,
+                lastMessageTime = lastMessage?.createdAt,
+                unreadCount = messageService.countUnreadMessages(userId, partnerId)
             )
         }
         
@@ -71,7 +70,7 @@ class ChatController(
                 messages = messages.content.map { it.toDto() }.reversed(), // Reverse để mới nhất ở cuối
                 currentPage = messages.number,
                 totalPages = messages.totalPages,
-                totalItems = messages.totalElements
+                totalMessages = messages.totalElements
             )
         )
     }
