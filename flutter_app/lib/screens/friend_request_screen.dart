@@ -37,11 +37,9 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
     });
 
     try {
-      final requests = await FriendService.getReceivedRequests();
+      final requests = await FriendService().getReceivedFriendRequests();
       setState(() {
-        _receivedRequests = requests
-            .map((r) => FriendRequest.fromJson(r))
-            .toList();
+        _receivedRequests = requests;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -60,11 +58,9 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
     });
 
     try {
-      final requests = await FriendService.getSentRequests();
+      final requests = await FriendService().getSentFriendRequests();
       setState(() {
-        _sentRequests = requests
-            .map((r) => FriendRequest.fromJson(r))
-            .toList();
+        _sentRequests = requests;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -79,7 +75,7 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
 
   Future<void> _acceptRequest(int requestId) async {
     try {
-      await FriendService.acceptRequest(requestId);
+      await FriendService().acceptFriendRequest(requestId);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Friend request accepted!')),
       );
@@ -93,7 +89,7 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
 
   Future<void> _rejectRequest(int requestId) async {
     try {
-      await FriendService.rejectRequest(requestId);
+      await FriendService().rejectFriendRequest(requestId);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Friend request rejected')),
       );
@@ -107,7 +103,7 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
 
   Future<void> _cancelRequest(int requestId) async {
     try {
-      await FriendService.cancelRequest(requestId);
+      await FriendService().cancelFriendRequest(requestId);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Friend request cancelled')),
       );
@@ -159,25 +155,16 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundImage: request.sender.avatarUrl != null
-                  ? NetworkImage(request.sender.avatarUrl!)
+              backgroundImage: request.senderAvatarUrl != null
+                  ? NetworkImage(request.senderAvatarUrl!)
                   : null,
-              child: request.sender.avatarUrl == null
-                  ? Text(request.sender.username[0].toUpperCase())
+              child: request.senderAvatarUrl == null
+                  ? Text(request.senderUsername[0].toUpperCase())
                   : null,
             ),
-            title: Row(
-              children: [
-                Text(request.sender.username),
-                if (request.sender.isVerified)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 4),
-                    child: Icon(Icons.verified, size: 16, color: Colors.blue),
-                  ),
-              ],
-            ),
-            subtitle: request.sender.fullName != null
-                ? Text(request.sender.fullName!)
+            title: Text(request.senderUsername),
+            subtitle: request.senderFullName != null
+                ? Text(request.senderFullName!)
                 : null,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -194,7 +181,7 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
             ),
             onTap: () {
               Navigator.pushNamed(context, '/user-profile',
-                  arguments: request.sender.id);
+                  arguments: request.senderId);
             },
           ),
         );
@@ -219,33 +206,24 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundImage: request.receiver.avatarUrl != null
-                  ? NetworkImage(request.receiver.avatarUrl!)
+              backgroundImage: request.receiverAvatarUrl != null
+                  ? NetworkImage(request.receiverAvatarUrl!)
                   : null,
-              child: request.receiver.avatarUrl == null
-                  ? Text(request.receiver.username[0].toUpperCase())
+              child: request.receiverAvatarUrl == null
+                  ? Text(request.receiverUsername[0].toUpperCase())
                   : null,
             ),
-            title: Row(
-              children: [
-                Text(request.receiver.username),
-                if (request.receiver.isVerified)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 4),
-                    child: Icon(Icons.verified, size: 16, color: Colors.blue),
-                  ),
-              ],
-            ),
+            title: Text(request.receiverUsername),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (request.receiver.fullName != null)
-                  Text(request.receiver.fullName!),
+                if (request.receiverFullName != null)
+                  Text(request.receiverFullName!),
                 Text(
                   'Status: ${request.status}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: request.isPending ? Colors.orange : Colors.grey,
+                    color: request.status == 'PENDING' ? Colors.orange : Colors.grey,
                   ),
                 ),
               ],
@@ -256,7 +234,7 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
             ),
             onTap: () {
               Navigator.pushNamed(context, '/user-profile',
-                  arguments: request.receiver.id);
+                  arguments: request.receiverId);
             },
           ),
         );

@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stomp_dart_client/stomp_dart_client.dart';
 import '../models/chat_models.dart';
 import '../services/chat_service.dart';
-import '../config/api_config.dart';
 
 class ChatScreen extends StatefulWidget {
   final UserSummary user;
@@ -24,7 +23,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = true;
   String? _error;
   String? _currentUsername;
-  int? _currentUserId;
   StompClient? _stompClient;
 
   @override
@@ -39,7 +37,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _currentUsername = prefs.getString('username');
-      _currentUserId = prefs.getInt('user_id');
     });
   }
 

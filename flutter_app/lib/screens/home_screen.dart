@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/post_service.dart';
+import '../services/friend_service.dart';
 import '../models/post_models.dart';
-import 'login_screen.dart';
+import '../models/friend_models.dart';
 import 'create_post_screen.dart';
 import 'profile_screen.dart';
 import 'user_profile_screen.dart';
@@ -22,14 +23,37 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   List<PostDto> _posts = [];
+  List<Friend> _friends = [];
   bool _isLoading = true;
+  bool _isFriendsLoading = true;
   int _userId = 0;
+  final FriendService _friendService = FriendService();
 
   @override
   void initState() {
     super.initState();
     _loadUserId();
     _loadPosts();
+    _loadFriends();
+  }
+
+  Future<void> _loadFriends() async {
+    try {
+      final friends = await _friendService.getFriends();
+      if (mounted) {
+        setState(() {
+          _friends = friends;
+          _isFriendsLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading friends: $e');
+      if (mounted) {
+        setState(() {
+          _isFriendsLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadUserId() async {
@@ -142,7 +166,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildFeedPage() {
     return RefreshIndicator(
-      onRefresh: _loadPosts,
+      onRefresh: () async {
+        await Future.wait([
+          _loadPosts(),
+          _loadFriends(),
+        ]);
+      },
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
@@ -219,51 +248,118 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStoriesRow() {
+    if (_isFriendsLoading) {
+      return Container(
+        height: 100,
+        margin: const EdgeInsets.only(top: 8, bottom: 8),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Container(
       height: 100,
       margin: const EdgeInsets.only(top: 8, bottom: 8),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: 10,
+        itemCount: _friends.length + 1, // +1 for "Your story"
         itemBuilder: (context, index) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Column(
-              children: [
-                Container(
-                  width: 65,
-                  height: 65,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: index == 0 ? Colors.grey[300]! : Colors.red,
-                      width: 2,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.grey[300],
+          if (index == 0) {
+            // Your story button
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Column(
+                children: [
+                  Container(
+                    width: 65,
+                    height: 65,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.grey[300]!,
+                        width: 2,
                       ),
-                      child: index == 0
-                          ? const Icon(Icons.add, color: Colors.black)
-                          : const Icon(Icons.person, color: Colors.white),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey[300],
+                        ),
+                        child: const Icon(Icons.add, color: Colors.black),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                SizedBox(
-                  width: 70,
-                  child: Text(
-                    index == 0 ? 'Your story' : 'user$index',
-                    style: const TextStyle(fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
+                  const SizedBox(height: 6),
+                  const SizedBox(
+                    width: 70,
+                    child: Text(
+                      'Your story',
+                      style: TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
                   ),
+                ],
+              ),
+            );
+          }
+
+          final friend = _friends[index - 1];
+          return GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => UserProfileScreen(userId: friend.userId),
                 ),
-              ],
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Column(
+                children: [
+                  Container(
+                    width: 65,
+                    height: 65,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.blue,
+                        width: 2,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: CircleAvatar(
+                        radius: 30,
+                        backgroundImage: friend.avatarUrl != null
+                            ? NetworkImage(friend.avatarUrl!)
+                            : null,
+                        child: friend.avatarUrl == null
+                            ? Text(
+                                friend.username[0].toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    width: 70,
+                    child: Text(
+                      friend.fullName ?? friend.username,
+                      style: const TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },

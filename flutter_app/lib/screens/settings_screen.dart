@@ -256,7 +256,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       value: value,
       onChanged: onChanged,
-      activeThumbColor: Colors.blue,
     );
   }
 }
