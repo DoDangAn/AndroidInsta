@@ -17,12 +17,6 @@ data class UserInfo(
     val roles: List<String>
 )
 
-data class TokenRefreshResponse(
-    val accessToken: String,
-    val tokenType: String = "Bearer",
-    val expiresIn: Long
-)
-
 data class AuthResponse(
     val success: Boolean,
     val message: String,

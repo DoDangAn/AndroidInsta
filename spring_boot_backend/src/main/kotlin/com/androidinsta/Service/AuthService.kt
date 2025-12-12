@@ -178,9 +178,23 @@ class AuthService(
             roles = roles
         )
 
-        return TokenRefreshResponse(
+        // Create JwtResponse with access token only (no new refresh token)
+        val jwtResponse = com.androidinsta.dto.JwtResponse(
             accessToken = newAccessToken,
-            expiresIn = jwtProperties.accessToken.expiration
+            refreshToken = refreshToken.token, // Keep existing refresh token
+            expiresIn = jwtProperties.accessToken.expiration,
+            user = com.androidinsta.dto.UserInfo(
+                id = user.id,
+                username = user.username,
+                email = user.email,
+                roles = roles
+            )
+        )
+
+        return TokenRefreshResponse(
+            success = true,
+            message = "Token refreshed successfully",
+            data = jwtResponse
         )
     }
 

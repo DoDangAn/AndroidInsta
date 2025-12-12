@@ -25,9 +25,15 @@ data class UserResponse(
  * Update user request
  */
 data class UpdateUserRequest(
+    @field:jakarta.validation.constraints.Email(message = "Email should be valid")
     val email: String?,
+    
+    @field:jakarta.validation.constraints.Size(max = 100, message = "Full name must not exceed 100 characters")
     val fullName: String?,
+    
+    @field:jakarta.validation.constraints.Size(max = 500, message = "Bio must not exceed 500 characters")
     val bio: String?,
+    
     val avatarUrl: String?
 )
 

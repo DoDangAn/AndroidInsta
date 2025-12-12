@@ -14,15 +14,15 @@ import java.time.LocalDateTime
 interface PostRepository : JpaRepository<Post, Long> {
     
     /**
-     * Lấy feed: posts từ người follow, posts public, và ADVERTISE posts
-     * Sắp xếp: ADVERTISE lên đầu, sau đó theo thời gian
+     * Lấy feed: CHỈ posts từ người follow + posts của chính mình + ADVERTISE posts
+     * KHÔNG hiển thị random public posts từ người lạ
+     * Sắp xếp: ADVERTISE lên đầu, sau đó theo thời gian (giống Instagram)
      */
     @Query("""
         SELECT DISTINCT p FROM Post p 
         LEFT JOIN FETCH p.mediaFiles 
         LEFT JOIN FETCH p.user 
         WHERE (p.user.id IN :followedUserIds 
-               OR p.visibility = 'PUBLIC' 
                OR p.visibility = 'ADVERTISE')
         ORDER BY 
             CASE WHEN p.visibility = 'ADVERTISE' THEN 0 ELSE 1 END,
@@ -60,6 +60,22 @@ interface PostRepository : JpaRepository<Post, Long> {
     fun findAdvertisePosts(pageable: Pageable): Page<Post>
     
     /**
+     * Lấy PUBLIC posts từ 7 ngày gần đây (Recent Posts)
+     */
+    @Query("""
+        SELECT DISTINCT p FROM Post p 
+        LEFT JOIN FETCH p.mediaFiles 
+        LEFT JOIN FETCH p.user 
+        WHERE p.visibility = 'PUBLIC'
+        AND p.createdAt >= :since
+        ORDER BY p.createdAt DESC
+    """)
+    fun findRecentPublicPosts(
+        @Param("since") since: LocalDateTime,
+        pageable: Pageable
+    ): Page<Post>
+    
+    /**
      * Lấy tất cả posts theo visibility
      */
     fun findByVisibilityOrderByCreatedAtDesc(
@@ -68,13 +84,17 @@ interface PostRepository : JpaRepository<Post, Long> {
     ): Page<Post>
     
     /**
-     * Tìm kiếm posts theo từ khóa (caption hoặc username)
+     * Tìm kiếm posts theo từ khóa (chỉ PUBLIC posts)
+     * Search trong caption và username của chủ post
+     * Sắp xếp: Exact match caption trước, sau đó theo thời gian
      */
     @Query("""
         SELECT DISTINCT p FROM Post p 
         LEFT JOIN p.user u 
-        WHERE LOWER(p.caption) LIKE LOWER(CONCAT('%', :keyword, '%'))
-           OR LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%'))
+        WHERE p.visibility = 'PUBLIC'
+        AND (LOWER(p.caption) LIKE LOWER(CONCAT('%', :keyword, '%'))
+             OR LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%'))
+             OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')))
         ORDER BY p.createdAt DESC
     """)
     fun searchPosts(@Param("keyword") keyword: String, pageable: Pageable): Page<Post>

@@ -30,6 +30,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   UserProfile? _userProfile;
   UserStats? _userStats;
   List<PostDto> _userPosts = [];
+  bool _isFollowing = false;  // State riêng cho follow status
 
   @override
   void initState() {
@@ -51,9 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _email = prefs.getString('email') ?? '';
 
       int? id = widget.userId;
-      if (id == null) {
-        id = _currentUserId;
-      }
+      id ??= _currentUserId;
 
       if (id == null) {
         setState(() {
@@ -97,6 +96,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _userStats = await UserService.getUserStats(_effectiveUserId!);
       } catch (e) {
         print('Error loading user stats: $e');
+      }
+
+      // Load follow status if viewing another user's profile
+      if (widget.userId != null && _currentUserId != null && widget.userId != _currentUserId) {
+        try {
+          final followStatus = await UserService.getFollowStatus(_effectiveUserId!);
+          _isFollowing = followStatus['isFollowing'] ?? false;
+        } catch (e) {
+          print('Error loading follow status: $e');
+        }
       }
 
       try {
@@ -369,15 +378,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: OutlinedButton(
               onPressed: _toggleFollow,
               style: OutlinedButton.styleFrom(
-                backgroundColor: (_userStats?.isFollowing ?? false) ? Colors.grey[200] : Colors.blue,
-                foregroundColor: (_userStats?.isFollowing ?? false) ? Colors.black : Colors.white,
-                side: BorderSide(color: (_userStats?.isFollowing ?? false) ? Colors.grey[300]! : Colors.blue),
+                backgroundColor: _isFollowing ? Colors.grey[200] : Colors.blue,
+                foregroundColor: _isFollowing ? Colors.black : Colors.white,
+                side: BorderSide(color: _isFollowing ? Colors.grey[300]! : Colors.blue),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
               child: Text(
-                (_userStats?.isFollowing ?? false) ? 'Following' : 'Follow',
+                _isFollowing ? 'Following' : 'Follow',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
@@ -446,21 +455,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _toggleFollow() async {
-    if (_effectiveUserId == null || _userStats == null) return;
+    if (_effectiveUserId == null) return;
 
     try {
       bool success;
-      if (_userStats!.isFollowing) {
+      if (_isFollowing) {
         success = await UserService.unfollowUser(_effectiveUserId!);
       } else {
         success = await UserService.followUser(_effectiveUserId!);
       }
 
       if (success) {
-        // Refresh stats
+        // Refresh stats and follow status
         final newStats = await UserService.getUserStats(_effectiveUserId!);
+        final followStatus = await UserService.getFollowStatus(_effectiveUserId!);
         setState(() {
           _userStats = newStats;
+          _isFollowing = followStatus['isFollowing'] ?? false;
         });
       }
     } catch (e) {

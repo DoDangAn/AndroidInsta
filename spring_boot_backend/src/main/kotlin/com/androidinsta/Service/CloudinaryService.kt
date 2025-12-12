@@ -2,18 +2,21 @@ package com.androidinsta.Service
 
 import com.cloudinary.Cloudinary
 import com.cloudinary.utils.ObjectUtils
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonProperty
 import org.springframework.stereotype.Service
 import org.springframework.web.multipart.MultipartFile
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class MediaUploadResult(
-    val url: String,
-    val publicId: String,
-    val thumbnailUrl: String? = null,
-    val duration: Int? = null,
-    val width: Int? = null,
-    val height: Int? = null,
-    val format: String? = null,
-    val size: Long? = null
+    @JsonProperty("url") val url: String,
+    @JsonProperty("publicId") val publicId: String,
+    @JsonProperty("thumbnailUrl") val thumbnailUrl: String? = null,
+    @JsonProperty("duration") val duration: Int? = null,
+    @JsonProperty("width") val width: Int? = null,
+    @JsonProperty("height") val height: Int? = null,
+    @JsonProperty("format") val format: String? = null,
+    @JsonProperty("size") val size: Long? = null
 )
 
 enum class ImageQuality {
@@ -28,11 +31,12 @@ enum class VideoQuality {
     LOW        // 480p - Standard
 }
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class VideoConfig(
-    val width: Int,
-    val height: Int,
-    val videoBitrate: String,
-    val audioBitrate: String
+    @JsonProperty("width") val width: Int,
+    @JsonProperty("height") val height: Int,
+    @JsonProperty("videoBitrate") val videoBitrate: String,
+    @JsonProperty("audioBitrate") val audioBitrate: String
 )
 
 @Service

@@ -3,7 +3,7 @@ import '../services/admin_service.dart';
 import '../models/admin_models.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({Key? key}) : super(key: key);
+  const AdminDashboardScreen({super.key});
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
@@ -252,7 +252,7 @@ class _AdminUsersTabState extends State<_AdminUsersTab> {
   final TextEditingController _searchController = TextEditingController();
   List<AdminUserDetail> _users = [];
   bool _isLoading = false;
-  int _currentPage = 0;
+  final int _currentPage = 0;
 
   @override
   void initState() {

@@ -1,6 +1,7 @@
 package com.androidinsta.controller.User
 
 import com.androidinsta.Service.SearchService
+import com.androidinsta.config.SecurityUtil
 import com.androidinsta.dto.*
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
@@ -8,6 +9,10 @@ import org.springframework.data.domain.Sort
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
+/**
+ * REST controller cho search operations
+ * Handles searching users, posts, reels, tags, and providing suggestions
+ */
 @RestController
 @RequestMapping("/api/search")
 class SearchController(
@@ -19,21 +24,17 @@ class SearchController(
      * GET /api/search/users?keyword=john&page=0&size=20
      */
     @GetMapping("/users")
-    @org.springframework.cache.annotation.Cacheable(
-        value = ["searchUsers"],
-        key = "#keyword + '_page_' + #page + '_size_' + #size"
-    )
     fun searchUsers(
         @RequestParam keyword: String,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int
     ): ResponseEntity<Page<UserSearchResult>> {
         if (keyword.isBlank()) {
-            return ResponseEntity.badRequest().build()
+            throw IllegalArgumentException("Keyword cannot be blank")
         }
         
         val currentUserId = try {
-            com.androidinsta.config.SecurityUtil.getCurrentUserId()
+            SecurityUtil.getCurrentUserId()
         } catch (e: Exception) {
             null
         }
@@ -54,7 +55,7 @@ class SearchController(
         @RequestParam(defaultValue = "20") size: Int
     ): ResponseEntity<Page<PostSearchResult>> {
         if (keyword.isBlank()) {
-            return ResponseEntity.badRequest().build()
+            throw IllegalArgumentException("Keyword cannot be blank")
         }
         
         val pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
@@ -73,7 +74,7 @@ class SearchController(
         @RequestParam(defaultValue = "20") size: Int
     ): ResponseEntity<Page<PostSearchResult>> {
         if (keyword.isBlank()) {
-            return ResponseEntity.badRequest().build()
+            throw IllegalArgumentException("Keyword cannot be blank")
         }
         
         val pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
@@ -92,7 +93,7 @@ class SearchController(
         @RequestParam(defaultValue = "20") size: Int
     ): ResponseEntity<Page<TagSearchResult>> {
         if (keyword.isBlank()) {
-            return ResponseEntity.badRequest().build()
+            throw IllegalArgumentException("Keyword cannot be blank")
         }
         
         val pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name"))
@@ -107,7 +108,7 @@ class SearchController(
     @GetMapping("/all")
     fun searchAll(@RequestParam keyword: String): ResponseEntity<SearchAllResult> {
         if (keyword.isBlank()) {
-            return ResponseEntity.badRequest().build()
+            throw IllegalArgumentException("Keyword cannot be blank")
         }
         
         val results = searchService.searchAll(keyword.trim())
@@ -145,7 +146,7 @@ class SearchController(
         }
         
         val currentUserId = try {
-            com.androidinsta.config.SecurityUtil.getCurrentUserId()
+            SecurityUtil.getCurrentUserId()
         } catch (e: Exception) {
             null
         }

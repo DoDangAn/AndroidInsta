@@ -1,9 +1,9 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 import '../config/api_config.dart';
 import '../models/chat_models.dart';
+import '../models/error_models.dart';
 
 class ChatService {
   final String baseUrl = ApiConfig.baseUrl;
@@ -33,7 +33,7 @@ class ChatService {
         throw Exception(data['message'] ?? 'Failed to load conversations');
       }
     } else {
-      throw Exception('Failed to load conversations');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
   
@@ -69,60 +69,31 @@ class ChatService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     
-    if (token == null) throw Exception('Không xác thực được. Vui lòng đăng nhập lại.');
+    if (token == null) throw Exception('Not authenticated');
     
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/messages'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'receiverId': receiverId,
-          'content': content,
-          'mediaUrl': mediaUrl,
-          'messageType': mediaUrl != null ? 'IMAGE' : 'TEXT',
-        }),
-      );
-      
-      print('Send message response status: ${response.statusCode}');
-      print('Send message response body: ${response.body}');
-      
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        try {
-          final data = json.decode(response.body);
-          if (data['success'] == true) {
-            return ChatMessage.fromJson(data['data']);
-          } else {
-            final errorMessage = data['message'] ?? 'Không thể gửi tin nhắn';
-            print('Error from server: $errorMessage');
-            throw Exception(errorMessage);
-          }
-        } catch (e) {
-          if (e is Exception) rethrow;
-          print('Error parsing response: $e');
-          throw Exception('Lỗi khi xử lý phản hồi từ server: ${response.body}');
-        }
-      } else if (response.statusCode == 401) {
-        throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-      } else if (response.statusCode == 400) {
-        try {
-          final data = json.decode(response.body);
-          final errorMessage = data['message'] ?? 'Dữ liệu không hợp lệ';
-          throw Exception(errorMessage);
-        } catch (e) {
-          throw Exception('Dữ liệu không hợp lệ: ${response.body}');
-        }
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/messages'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode({
+        'receiverId': receiverId,
+        'content': content,
+        'mediaUrl': mediaUrl,
+        'messageType': mediaUrl != null ? 'IMAGE' : 'TEXT',
+      }),
+    );
+    
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return ChatMessage.fromJson(data['data']);
       } else {
-        throw Exception('Lỗi server (${response.statusCode}): ${response.body}');
+        throw Exception(data['message'] ?? 'Failed to send message');
       }
-    } catch (e) {
-      if (e is Exception) {
-        rethrow;
-      }
-      print('Network error: $e');
-      throw Exception('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
+    } else {
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
   
@@ -142,9 +113,6 @@ class ChatService {
     );
   }
   
-  /// Connect WebSocket
-  WebSocketChannel connectWebSocket(String token) {
-    const wsUrl = 'ws://10.0.2.2:8081/ws';
-    return WebSocketChannel.connect(Uri.parse(wsUrl));
-  }
+  // Note: WebSocket connection is handled directly in chat_screen.dart using STOMP
+  // sendMessage() is kept as REST API fallback when WebSocket is disconnected
 }

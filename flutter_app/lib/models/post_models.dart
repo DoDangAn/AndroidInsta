@@ -56,16 +56,30 @@ class PostDto {
   String get username => user.username;
 
   factory PostDto.fromJson(Map<String, dynamic> json) {
+    // Backend có thể trả về 2 format: user object hoặc flat fields
+    PostUser user;
+    if (json.containsKey('user') && json['user'] is Map) {
+      user = PostUser.fromJson(json['user']);
+    } else {
+      // Flat format từ backend (userId, username, userAvatarUrl)
+      user = PostUser(
+        id: json['userId'] ?? 0,
+        username: json['username'] ?? '',
+        fullName: json['fullName'],
+        avatarUrl: json['userAvatarUrl'],
+      );
+    }
+
     return PostDto(
       id: json['id'] ?? 0,
-      user: PostUser.fromJson(json['user'] ?? {}),
+      user: user,
       caption: json['caption'],
       visibility: json['visibility'] ?? 'PUBLIC',
       mediaFiles: (json['mediaFiles'] as List? ?? [])
           .map((m) => MediaFile.fromJson(m))
           .toList(),
-      likesCount: json['likesCount'] ?? 0,
-      commentsCount: json['commentsCount'] ?? 0,
+      likesCount: json['likeCount'] ?? json['likesCount'] ?? 0,
+      commentsCount: json['commentCount'] ?? json['commentsCount'] ?? 0,
       isLiked: json['isLiked'] ?? false,
       createdAt: json['createdAt'] ?? '',
       updatedAt: json['updatedAt'],
@@ -136,12 +150,14 @@ class Comment {
     return Comment(
       id: json['id'] ?? 0,
       content: json['content'] ?? '',
+      // Backend trả về flat fields (userId, username, userAvatarUrl)
+      // hoặc nested object (user: {...})
       user: json['user'] != null 
           ? PostUser.fromJson(json['user'])
           : PostUser(
               id: json['userId'] ?? 0,
               username: json['username'] ?? '',
-              avatarUrl: json['avatarUrl'],
+              avatarUrl: json['userAvatarUrl'], // Backend dùng 'userAvatarUrl' không phải 'avatarUrl'
             ),
       createdAt: json['createdAt'] ?? '',
     );

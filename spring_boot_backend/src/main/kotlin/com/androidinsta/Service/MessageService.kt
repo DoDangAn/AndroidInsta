@@ -2,7 +2,7 @@ package com.androidinsta.Service
 
 import com.androidinsta.Model.Message
 import com.androidinsta.Model.MessageType
-import com.androidinsta.Repository.MessageRepository
+import com.androidinsta.Repository.User.MessageRepository
 import com.androidinsta.Repository.User.UserRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -76,42 +76,21 @@ class MessageService(
      * Lấy chat history với pagination
      */
     fun getChatHistory(userId: Long, partnerId: Long, pageable: Pageable): Page<Message> {
-        val cacheKey = "chat:history:$userId:$partnerId:${pageable.pageNumber}"
-        
-        val cached = redisService.get(cacheKey, Page::class.java)
-        if (cached != null) {
-            @Suppress("UNCHECKED_CAST")
-            return cached as Page<Message>
-        }
-        
-        val result = messageRepository.findChatHistory(userId, partnerId, pageable)
-        redisService.set(cacheKey, result, java.time.Duration.ofMinutes(5))
-        
-        return result
+        // DON'T cache Page<Message> - complex DTO, query is fast with DB indexes
+        return messageRepository.findChatHistory(userId, partnerId, pageable)
     }
     
     /**
      * Lấy danh sách conversations
      */
     fun getConversations(userId: Long): List<Pair<Long, Message?>> {
-        val cacheKey = "conversation:$userId"
-        
-        val cached = redisService.get(cacheKey, List::class.java)
-        if (cached != null) {
-            @Suppress("UNCHECKED_CAST")
-            return cached as List<Pair<Long, Message?>>
-        }
-        
+        // DON'T cache conversation list - complex structure with Message entities
         val partnerIds = messageRepository.findChatPartners(userId)
         
-        val result = partnerIds.map { partnerId ->
+        return partnerIds.map { partnerId ->
             val lastMessage = messageRepository.findLastMessage(userId, partnerId)
             partnerId to lastMessage
         }.sortedByDescending { it.second?.createdAt }
-        
-        redisService.set(cacheKey, result, java.time.Duration.ofMinutes(5))
-        
-        return result
     }
     
     /**
@@ -120,9 +99,14 @@ class MessageService(
     fun countUnreadMessages(receiverId: Long, senderId: Long): Long {
         val cacheKey = "unread:messages:$receiverId:$senderId"
         
-        val cached = redisService.get(cacheKey, Long::class.java)
+        val cached = redisService.get(cacheKey)
         if (cached != null) {
-            return cached
+            return when (cached) {
+                is Long -> cached
+                is Int -> cached.toLong()
+                is Number -> cached.toLong()
+                else -> 0L
+            }
         }
         
         val count = messageRepository.countUnreadMessages(receiverId, senderId)

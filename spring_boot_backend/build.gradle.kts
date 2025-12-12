@@ -34,6 +34,7 @@ dependencies {
     // Redis for caching and session management
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("org.apache.commons:commons-pool2:2.12.0") // Required for Redis connection pooling
     
     // Kafka for event-driven architecture
     implementation("org.springframework.kafka:spring-kafka")

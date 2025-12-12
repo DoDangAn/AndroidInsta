@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/post_models.dart';
 import '../services/post_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -23,10 +24,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   List<Comment> _comments = [];
   bool _isLoadingComments = true;
   bool _isLoadingPost = false;
+  int? _currentUserId;
+  Comment? _replyingTo;
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentUserId();
     if (widget.post != null) {
       _post = widget.post;
       _isLiked = _post!.likedByCurrentUser;
@@ -35,6 +39,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     } else if (widget.postId != null) {
       _loadPost();
     }
+  }
+
+  Future<void> _loadCurrentUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _currentUserId = prefs.getInt('user_id');
+    });
   }
 
   Future<void> _loadPost() async {
@@ -114,17 +125,69 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (content.isEmpty) return;
 
     _commentController.clear();
-    FocusScope.of(context).unfocus();
+    if (mounted) {
+      FocusScope.of(context).unfocus();
+    }
 
     try {
-      final newComment = await PostService.addComment(_post!.id, content);
-      setState(() {
-        _comments.insert(0, newComment);
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error posting comment: $e')),
+      final newComment = await PostService.addComment(
+        _post!.id, 
+        content,
+        parentCommentId: _replyingTo?.id,
       );
+      if (mounted) {
+        setState(() {
+          _comments.insert(0, newComment);
+          _replyingTo = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error posting comment: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteComment(int commentId, int index) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await PostService.deleteComment(_post!.id, commentId);
+        if (mounted) {
+          setState(() {
+            _comments.removeAt(index);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Comment deleted')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting comment: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -475,6 +538,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       itemCount: _comments.length,
                       itemBuilder: (context, index) {
                         final comment = _comments[index];
+                        final isOwner = _currentUserId != null && comment.user.id == _currentUserId;
+                        
                         return ListTile(
                           leading: CircleAvatar(
                             radius: 16,
@@ -497,10 +562,37 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               ],
                             ),
                           ),
-                          subtitle: Text(
-                            timeago.format(DateTime.parse(comment.createdAt)),
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          subtitle: Row(
+                            children: [
+                              Text(
+                                timeago.format(DateTime.parse(comment.createdAt)),
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
+                              const SizedBox(width: 16),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _replyingTo = comment;
+                                  });
+                                  FocusScope.of(context).requestFocus(FocusNode());
+                                },
+                                child: Text(
+                                  'Reply',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
+                          trailing: isOwner
+                              ? IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 18),
+                                  onPressed: () => _deleteComment(comment.id, index),
+                                )
+                              : null,
                         );
                       },
                     ),
@@ -515,20 +607,53 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               color: Colors.white,
               border: Border(top: BorderSide(color: Colors.grey[300]!)),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    decoration: const InputDecoration(
-                      hintText: 'Add a comment...',
-                      border: InputBorder.none,
+                if (_replyingTo != null)
+                  Container(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Replying to ${_replyingTo!.username}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 16),
+                          onPressed: () {
+                            setState(() {
+                              _replyingTo = null;
+                            });
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                TextButton(
-                  onPressed: _addComment,
-                  child: const Text('Post'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _commentController,
+                        decoration: const InputDecoration(
+                          hintText: 'Add a comment...',
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _addComment,
+                      child: const Text('Post'),
+                    ),
+                  ],
                 ),
               ],
             ),

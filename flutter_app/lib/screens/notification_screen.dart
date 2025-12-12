@@ -167,18 +167,52 @@ class _NotificationScreenState extends State<NotificationScreen> {
         return 'liked your post.';
       case 'COMMENT':
         return 'commented on your post.';
+      case 'NEW_POST':
+        return 'posted a new photo.';
+      case 'MESSAGE':
+        return 'sent you a message.';
       default:
         return 'interacted with you.';
     }
   }
 
   void _handleNotificationTap(NotificationModel notification) {
-    // Always navigate to profile for now
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProfileScreen(userId: notification.senderId),
-      ),
-    );
+    // Navigate based on notification type
+    if (notification.type == 'LIKE' || 
+        notification.type == 'COMMENT' || 
+        notification.type == 'NEW_POST') {
+      // Navigate to post detail if entityId exists
+      if (notification.entityId != null) {
+        Navigator.pushNamed(
+          context,
+          '/post-detail',
+          arguments: notification.entityId,
+        );
+      } else {
+        // Fallback to profile
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProfileScreen(userId: notification.senderId),
+          ),
+        );
+      }
+    } else if (notification.type == 'MESSAGE') {
+      // Navigate to chat screen (implement if needed)
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProfileScreen(userId: notification.senderId),
+        ),
+      );
+    } else {
+      // Default: Navigate to profile
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProfileScreen(userId: notification.senderId),
+        ),
+      );
+    }
   }
 }

@@ -8,13 +8,20 @@ import com.androidinsta.dto.toDto
 import org.springframework.messaging.handler.annotation.MessageMapping
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor
+import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.messaging.simp.annotation.SendToUser
 import org.springframework.stereotype.Controller
 import java.security.Principal
 
+/**
+ * WebSocket controller cho real-time chat
+ * Handles WebSocket connections for instant messaging
+ * Client connects via STOMP over WebSocket
+ */
 @Controller
 class WebSocketChatController(
-    private val messageService: MessageService
+    private val messageService: MessageService,
+    private val messagingTemplate: SimpMessagingTemplate
 ) {
     
     /**
@@ -29,9 +36,8 @@ class WebSocketChatController(
         headerAccessor: SimpMessageHeaderAccessor,
         principal: Principal?
     ): MessageDto {
-        // Get sender ID from principal (JWT authentication)
         val senderId = principal?.name?.toLongOrNull() 
-            ?: throw RuntimeException("User not authenticated")
+            ?: throw IllegalStateException("User not authenticated")
         
         val messageType = try {
             MessageType.valueOf(request.messageType.lowercase())
@@ -53,18 +59,41 @@ class WebSocketChatController(
     /**
      * Typing indicator
      * Client gửi: /app/typing
+     * Server broadcast đến receiver: /user/{receiverId}/queue/typing
      */
     @MessageMapping("/typing")
     fun handleTyping(
         @Payload data: TypingIndicator,
+        headerAccessor: SimpMessageHeaderAccessor,
         principal: Principal?
     ) {
-        // Broadcast typing indicator to receiver
-        // Implementation depends on requirements
+        val senderId = principal?.name?.toLongOrNull() 
+            ?: throw IllegalStateException("User not authenticated")
+        
+        // Send typing indicator to specific receiver
+        messagingTemplate.convertAndSendToUser(
+            data.receiverId.toString(),
+            "/queue/typing",
+            TypingIndicatorResponse(
+                senderId = senderId,
+                isTyping = data.isTyping
+            )
+        )
     }
 }
 
+/**
+ * Data class for typing indicator events (request from client)
+ */
 data class TypingIndicator(
     val receiverId: Long,
+    val isTyping: Boolean
+)
+
+/**
+ * Data class for typing indicator response (sent to receiver)
+ */
+data class TypingIndicatorResponse(
+    val senderId: Long,
     val isTyping: Boolean
 )

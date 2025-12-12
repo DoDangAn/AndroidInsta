@@ -24,13 +24,7 @@ class AdminStatsService(
      * Get overall system statistics with caching
      */
     fun getOverviewStats(): AdminOverviewStatsDto {
-        val cacheKey = "admin:stats:overview"
-        val cached = redisService.get(cacheKey)
-        
-        if (cached != null && cached is AdminOverviewStatsDto) {
-            return cached
-        }
-        
+        // DON'T cache AdminOverviewStatsDto - complex DTO, query is fast
         val totalUsers = userRepository.count()
         val activeUsers = userRepository.countByIsActive(true)
         val verifiedUsers = userRepository.countByIsVerified(true)
@@ -55,9 +49,7 @@ class AdminStatsService(
             newPostsToday = newPostsToday
         )
         
-        // Cache for 5 minutes - stats change frequently
-        redisService.set(cacheKey, stats, java.time.Duration.ofMinutes(5))
-        
+        // DON'T cache AdminOverallStatsDto - complex DTO, query is fast with DB indexes
         return stats
     }
 
@@ -112,7 +104,7 @@ class AdminStatsService(
     /**
      * Get engagement statistics (likes, comments, follows)
      */
-    fun getEngagementStats(period: String): Map<String, AdminTimeStatsDto> {
+    fun getEngagementStats(period: String): EngagementStatsData {
         val days = parsePeriod(period)
         val startDate = LocalDateTime.now().minusDays(days.toLong())
         
@@ -137,31 +129,19 @@ class AdminStatsService(
             }
             .sortedBy { it.date }
         
-        return mapOf(
-            "likes" to AdminTimeStatsDto(period, likesByDay),
-            "comments" to AdminTimeStatsDto(period, commentsByDay),
-            "follows" to AdminTimeStatsDto(period, followsByDay)
+        return EngagementStatsData(
+            likes = AdminTimeStatsDto(period, likesByDay),
+            comments = AdminTimeStatsDto(period, commentsByDay),
+            follows = AdminTimeStatsDto(period, followsByDay)
         )
     }
 
     /**
-     * Get top users (most followers, posts, or likes) with caching
+     * Get top users (most followers, posts, or likes)
+     * DON'T cache List<AdminTopUserDto> - complex DTO, query is fast with DB indexes
      */
     fun getTopUsers(type: String, limit: Int): List<AdminTopUserDto> {
-        val cacheKey = "admin:top:users:$type:$limit"
-        val cached = redisService.get(cacheKey)
-        
-        @Suppress("UNCHECKED_CAST")
-        if (cached != null && cached is List<*>) {
-            return cached as List<AdminTopUserDto>
-        }
-        
-        val result = getTopUsersInternal(type, limit)
-        
-        // Cache for 10 minutes
-        redisService.set(cacheKey, result, java.time.Duration.ofMinutes(10))
-        
-        return result
+        return getTopUsersInternal(type, limit)
     }
     
     private fun getTopUsersInternal(type: String, limit: Int): List<AdminTopUserDto> {
@@ -223,14 +203,7 @@ class AdminStatsService(
      * Get top posts (most liked or commented) with caching
      */
     fun getTopPosts(type: String, limit: Int): List<AdminTopPostDto> {
-        val cacheKey = "admin:top:posts:$type:$limit"
-        val cached = redisService.get(cacheKey)
-        
-        @Suppress("UNCHECKED_CAST")
-        if (cached != null && cached is List<*>) {
-            return cached as List<AdminTopPostDto>
-        }
-        
+        // DON'T cache List<AdminTopPostDto> - complex DTO, query is fast with DB indexes
         val posts = postRepository.findAll()
         
         val result = when (type.lowercase()) {
@@ -267,9 +240,7 @@ class AdminStatsService(
             else -> emptyList()
         }
         
-        // Cache for 10 minutes
-        redisService.set(cacheKey, result, java.time.Duration.ofMinutes(10))
-        
+        // DON'T cache List<AdminTopPostDto> - complex DTO, query is fast with DB indexes
         return result
     }
 

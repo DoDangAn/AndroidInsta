@@ -85,7 +85,7 @@ class KafkaProducerService(
             "followedId" to followedId,
             "timestamp" to System.currentTimeMillis()
         )
-        send("user-unfollowed", followerId.toString(), event)
+        send(KafkaConfig.USER_UNFOLLOWED_TOPIC, followerId.toString(), event)
     }
 
     /**
@@ -97,7 +97,7 @@ class KafkaProducerService(
             "userId" to userId,
             "timestamp" to System.currentTimeMillis()
         )
-        send("post-unliked", postId.toString(), event)
+        send(KafkaConfig.POST_UNLIKED_TOPIC, postId.toString(), event)
     }
 
     /**
@@ -109,7 +109,7 @@ class KafkaProducerService(
             "userId" to userId,
             "timestamp" to System.currentTimeMillis()
         )
-        send("post-deleted", postId.toString(), event)
+        send(KafkaConfig.POST_DELETED_TOPIC, postId.toString(), event)
     }
 
     /**
@@ -121,7 +121,7 @@ class KafkaProducerService(
             "userId" to userId,
             "timestamp" to System.currentTimeMillis()
         )
-        send("post-updated", postId.toString(), event)
+        send(KafkaConfig.POST_UPDATED_TOPIC, postId.toString(), event)
     }
 
     /**
@@ -135,7 +135,7 @@ class KafkaProducerService(
             "content" to content,
             "timestamp" to System.currentTimeMillis()
         )
-        send("message-sent", messageId.toString(), event)
+        send(KafkaConfig.MESSAGE_SENT_TOPIC, messageId.toString(), event)
     }
 
     /**
@@ -147,7 +147,7 @@ class KafkaProducerService(
             "userId" to userId,
             "timestamp" to System.currentTimeMillis()
         )
-        send("message-deleted", messageId.toString(), event)
+        send(KafkaConfig.MESSAGE_DELETED_TOPIC, messageId.toString(), event)
     }
 
     /**
@@ -159,7 +159,7 @@ class KafkaProducerService(
             "friendId" to friendId,
             "timestamp" to System.currentTimeMillis()
         )
-        send("friend-accepted", userId.toString(), event)
+        send(KafkaConfig.FRIEND_ACCEPTED_TOPIC, userId.toString(), event)
     }
 
     /**
@@ -171,7 +171,7 @@ class KafkaProducerService(
             "username" to username,
             "timestamp" to System.currentTimeMillis()
         )
-        send("password-changed", userId.toString(), event)
+        send(KafkaConfig.PASSWORD_CHANGED_TOPIC, userId.toString(), event)
     }
 
     /**
@@ -184,7 +184,7 @@ class KafkaProducerService(
             "deletedBy" to "ADMIN",
             "timestamp" to System.currentTimeMillis()
         )
-        send("admin-post-deleted", postId.toString(), event)
+        send(KafkaConfig.ADMIN_POST_DELETED_TOPIC, postId.toString(), event)
     }
 
     /**

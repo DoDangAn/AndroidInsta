@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:io' show File;
+import 'package:image_picker/image_picker.dart';
+import '../services/reel_service.dart';
 
 class CreateReelScreen extends StatefulWidget {
-  const CreateReelScreen({Key? key}) : super(key: key);
+  const CreateReelScreen({super.key});
 
   @override
   State<CreateReelScreen> createState() => _CreateReelScreenState();
@@ -10,32 +12,82 @@ class CreateReelScreen extends StatefulWidget {
 
 class _CreateReelScreenState extends State<CreateReelScreen> {
   final TextEditingController _captionController = TextEditingController();
-  final TextEditingController _musicNameController = TextEditingController();
-  final TextEditingController _musicArtistController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
   
   File? _selectedVideo;
   bool _isUploading = false;
+  String _visibility = 'PUBLIC';
 
   @override
   void dispose() {
     _captionController.dispose();
-    _musicNameController.dispose();
-    _musicArtistController.dispose();
     super.dispose();
   }
 
   Future<void> _pickVideo() async {
-    // TODO: Implement video picker
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Video picker not implemented yet')),
-    );
+    try {
+      final XFile? video = await _picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(minutes: 15),
+      );
+      
+      if (video != null) {
+        final file = File(video.path);
+        final fileSize = await file.length();
+        
+        if (fileSize > 200 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Video must be less than 200MB')),
+            );
+          }
+          return;
+        }
+        
+        setState(() {
+          _selectedVideo = file;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking video: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _recordVideo() async {
-    // TODO: Implement video recording
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Video recording not implemented yet')),
-    );
+    try {
+      final XFile? video = await _picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(minutes: 15),
+      );
+      
+      if (video != null) {
+        final file = File(video.path);
+        final fileSize = await file.length();
+        
+        if (fileSize > 200 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Video must be less than 200MB')),
+            );
+          }
+          return;
+        }
+        
+        setState(() {
+          _selectedVideo = file;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error recording video: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _uploadReel() async {
@@ -51,21 +103,37 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     });
 
     try {
-      // TODO: Upload reel to backend
-      await Future.delayed(const Duration(seconds: 2)); // Simulate upload
+      await ReelService.uploadReel(
+        videoFile: _selectedVideo!,
+        caption: _captionController.text.trim(),
+        visibility: _visibility,
+        quality: 'HIGH',
+      );
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reel uploaded successfully!')),
-      );
-      Navigator.pop(context, true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reel uploaded successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading reel: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading reel: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isUploading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
     }
   }
 
@@ -163,35 +231,25 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Music section
-            const Text(
-              'Add Music',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _musicNameController,
+            // Visibility selector
+            DropdownButtonFormField<String>(
+              value: _visibility,
               decoration: const InputDecoration(
-                labelText: 'Music Name',
-                hintText: 'Enter music name...',
+                labelText: 'Visibility',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.music_note),
+                prefixIcon: Icon(Icons.public),
               ),
-              enabled: !_isUploading,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _musicArtistController,
-              decoration: const InputDecoration(
-                labelText: 'Artist',
-                hintText: 'Enter artist name...',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
-              ),
-              enabled: !_isUploading,
+              items: const [
+                DropdownMenuItem(value: 'PUBLIC', child: Text('Public')),
+                DropdownMenuItem(value: 'PRIVATE', child: Text('Private')),
+              ],
+              onChanged: _isUploading ? null : (value) {
+                if (value != null) {
+                  setState(() {
+                    _visibility = value;
+                  });
+                }
+              },
             ),
             const SizedBox(height: 24),
 

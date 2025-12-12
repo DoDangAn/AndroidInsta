@@ -1,157 +1,91 @@
-package com.androidinsta.controller
+package com.androidinsta.controller.User
 
 import com.androidinsta.Service.PostService
+import com.androidinsta.Service.LikeService
+import com.androidinsta.Model.Visibility
 import com.androidinsta.config.SecurityUtil
 import com.androidinsta.dto.*
+import jakarta.validation.Valid
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
+/**
+ * Post Controller
+ * Handles CRUD operations for posts, feed, and interactions
+ */
 @RestController
 @RequestMapping("/api/posts")
 class PostController(
     private val postService: PostService,
-    private val likeService: com.androidinsta.Service.LikeService
+    private val likeService: LikeService
 ) {
     
     /**
-     * GET /api/posts/feed - Lấy feed posts
-     * Hiển thị posts của người mình follow + posts public
+     * GET /api/posts/feed - Get personalized feed (Instagram-like behavior)
+     * 
+     * Feed hiển thị:
+     * 1. Posts từ những người user đã follow
+     * 2. Posts của chính user
+     * 3. ADVERTISE posts (quảng cáo)
+     * 
+     * KHÔNG hiển thị random public posts từ người lạ
+     * 
+     * Cached at Service layer với key: userId_page_size
+     * Cache sẽ bị invalidate khi có post mới được tạo
+     * 
+     * @param page Page number (default: 0)
+     * @param size Page size (default: 20)
+     * @return FeedResponse chứa danh sách posts được phân trang
      */
-    @org.springframework.cache.annotation.Cacheable(value = ["feedPosts"], key = "#userId + '_page_' + #page + '_size_' + #size")
     @GetMapping("/feed")
     fun getFeed(
-        @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "20") size: Int
+        @RequestParam(value = "page", required = false, defaultValue = "0") page: Int,
+        @RequestParam(value = "size", required = false, defaultValue = "20") size: Int
     ): ResponseEntity<FeedResponse> {
         val userId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            ?: throw IllegalStateException("User not authenticated")
         
         val pageable = PageRequest.of(page, size, Sort.by("createdAt").descending())
-        val posts = postService.getFeedPosts(userId, pageable)
-        
-        return ResponseEntity.ok(
-            FeedResponse(
-                posts = posts.content.map { it.toDto(userId) },
-                currentPage = posts.number,
-                totalPages = posts.totalPages,
-                totalItems = posts.totalElements
-            )
-        )
+        val response = postService.getFeedResponse(userId, pageable)
+        return ResponseEntity.ok(response)
     }
     
     /**
-     * GET /api/posts/user/{userId} - Lấy posts của một user
+     * GET /api/posts/user/{userId} - Get user's posts
      */
-    @org.springframework.cache.annotation.Cacheable(value = ["userPosts"], key = "#userId + '_' + (#currentUserId ?: 'guest') + '_page_' + #page + '_size_' + #size")
     @GetMapping("/user/{userId}")
     fun getUserPosts(
         @PathVariable userId: Long,
-        @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "20") size: Int
+        @RequestParam(value = "page", required = false, defaultValue = "0") page: Int,
+        @RequestParam(value = "size", required = false, defaultValue = "20") size: Int
     ): ResponseEntity<FeedResponse> {
         val currentUserId = SecurityUtil.getCurrentUserId()
         val pageable = PageRequest.of(page, size)
-        val posts = postService.getUserPosts(userId, currentUserId, pageable)
-        
-        return ResponseEntity.ok(
-            FeedResponse(
-                posts = posts.content.map { it.toDto(currentUserId) },
-                currentPage = posts.number,
-                totalPages = posts.totalPages,
-                totalItems = posts.totalElements
-            )
-        )
+        val response = postService.getUserPostsResponse(userId, currentUserId, pageable)
+        return ResponseEntity.ok(response)
     }
     
     /**
-     * POST /api/posts - Tạo post mới
+     * GET /api/posts/{postId} - Get post details
      */
-    @org.springframework.cache.annotation.CacheEvict(value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"], allEntries = true)
-    @PostMapping
-    fun createPost(@RequestBody request: CreatePostRequest): ResponseEntity<PostDto> {
-        val userId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
-        
-        val visibility = try {
-            com.androidinsta.Model.Visibility.valueOf(request.visibility.uppercase())
-        } catch (e: Exception) {
-            com.androidinsta.Model.Visibility.PUBLIC
-        }
-        
-        val post = postService.createPost(
-            userId = userId,
-            caption = request.caption,
-            visibility = visibility,
-            mediaUrls = request.mediaUrls
-        )
-        
-        return ResponseEntity.status(HttpStatus.CREATED).body(post.toDto(userId))
-    }
-    
-    /**
-     * DELETE /api/posts/{postId} - Xóa post
-     */
-    @org.springframework.cache.annotation.CacheEvict(value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"], allEntries = true)
-    @DeleteMapping("/{postId}")
-    fun deletePost(@PathVariable postId: Long): ResponseEntity<Unit> {
-        val userId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
-        
-        postService.deletePost(postId, userId)
-        return ResponseEntity.noContent().build()
-    }
-
-    /**
-     * PUT /api/posts/{postId} - Cập nhật post
-     */
-    @org.springframework.cache.annotation.CacheEvict(value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"], allEntries = true)
-    @PutMapping("/{postId}")
-    fun updatePost(
-        @PathVariable postId: Long,
-        @RequestBody request: PostUpdateRequest
-    ): ResponseEntity<PostDto> {
-        val userId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
-            
-        val updatedPost = postService.updatePost(
-            postId = postId,
-            userId = userId,
-            caption = request.caption,
-            visibility = request.visibility
-        )
-        
-        return ResponseEntity.ok(updatedPost.toDto(userId))
-    }
-    
-    /**
-     * GET /api/posts/{postId} - Lấy chi tiết một post
-     */
-    @org.springframework.cache.annotation.Cacheable(value = ["postDetail"], key = "#postId + '_' + (#currentUserId ?: 'guest')")
     @GetMapping("/{postId}")
     fun getPost(@PathVariable postId: Long): ResponseEntity<PostDto> {
         val currentUserId = SecurityUtil.getCurrentUserId()
-        
-        return try {
-            val post = postService.getPostById(postId, currentUserId)
-            ResponseEntity.ok(post.toDto(currentUserId))
-        } catch (e: RuntimeException) {
-            ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(null)
-        }
+        val post = postService.getPostById(postId, currentUserId)
+        return ResponseEntity.ok(post.toDto(currentUserId))
     }
     
     /**
-     * GET /api/posts/advertise - Lấy quảng cáo posts
-     * Không cần authentication, ai cũng xem được
+     * GET /api/posts/advertise - Get recent PUBLIC posts (last 7 days)
+     * Hiển thị các bài viết PUBLIC được đăng trong vòng 1 tuần gần đây
      */
-    @org.springframework.cache.annotation.Cacheable(value = ["advertisePosts"], key = "'public_page_' + #page + '_size_' + #size")
     @GetMapping("/advertise")
     fun getAdvertisePosts(
-        @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "10") size: Int
+        @RequestParam(value = "page", required = false, defaultValue = "0") page: Int,
+        @RequestParam(value = "size", required = false, defaultValue = "10") size: Int
     ): ResponseEntity<FeedResponse> {
         val currentUserId = SecurityUtil.getCurrentUserId()
         val pageable = PageRequest.of(page, size)
@@ -166,38 +100,183 @@ class PostController(
             )
         )
     }
+    
+    /**
+     * POST /api/posts - Create new post
+     * 
+     * Request Body Validation:
+     * - caption: Optional, max 2200 characters
+     * - visibility: Required, must be "PUBLIC", "PRIVATE", or "ADVERTISE"
+     * - mediaUrls: Required, min 1 max 10 URLs, must be valid Cloudinary URLs
+     * 
+     * Response:
+     * - 201 CREATED: Post được tạo thành công
+     * - 400 BAD REQUEST: Validation errors
+     * - 401 UNAUTHORIZED: User chưa authenticate
+     * 
+     * Cache Eviction:
+     * - Invalidate tất cả feed, user posts, advertise posts cache
+     * - Đảm bảo post mới hiển thị ngay lập tức
+     * 
+     * @param request CreatePostRequest DTO đã validated
+     * @return PostDto với HTTP 201 status
+     */
+    @PostMapping
+    @org.springframework.cache.annotation.CacheEvict(
+        value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"], 
+        allEntries = true
+    )
+    fun createPost(@Valid @RequestBody request: CreatePostRequest): ResponseEntity<PostDto> {
+        val userId = SecurityUtil.getCurrentUserId()
+            ?: throw IllegalStateException("User not authenticated")
+        
+        val post = postService.createPost(
+            userId = userId,
+            caption = request.caption,
+            visibility = Visibility.valueOf(request.visibility),
+            mediaUrls = request.mediaUrls
+        )
+        
+        return ResponseEntity.status(HttpStatus.CREATED).body(post.toDto(userId))
+    }
+    
+    /**
+     * PUT /api/posts/{postId} - Update post
+     */
+    @PutMapping("/{postId}")
+    @org.springframework.cache.annotation.CacheEvict(
+        value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"], 
+        allEntries = true
+    )
+    fun updatePost(
+        @PathVariable postId: Long,
+        @Valid @RequestBody request: PostUpdateRequest
+    ): ResponseEntity<PostDto> {
+        val userId = SecurityUtil.getCurrentUserId()
+            ?: throw IllegalStateException("User not authenticated")
+            
+        val updatedPost = postService.updatePost(
+            postId = postId,
+            userId = userId,
+            caption = request.caption,
+            visibility = request.visibility
+        )
+        
+        return ResponseEntity.ok(updatedPost.toDto(userId))
+    }
+    
+    /**
+     * DELETE /api/posts/{postId} - Delete post
+     */
+    @DeleteMapping("/{postId}")
+    @org.springframework.cache.annotation.CacheEvict(
+        value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"], 
+        allEntries = true
+    )
+    fun deletePost(@PathVariable postId: Long): ResponseEntity<Void> {
+        val userId = SecurityUtil.getCurrentUserId()
+            ?: throw IllegalStateException("User not authenticated")
+        
+        postService.deletePost(postId, userId)
+        return ResponseEntity.noContent().build()
+    }
 
     /**
      * POST /api/posts/{postId}/like - Like a post
+     * 
+     * Business Logic:
+     * - Idempotent: Nếu đã like rồi thì không tạo duplicate
+     * - Tạo Like entity với composite key (userId, postId)
+     * - Tăng like count của post
+     * - Có thể trigger notification cho chủ post
+     * 
+     * Response:
+     * - success: true nếu like thành công, false nếu đã like trước đó
+     * - likesCount: Tổng số likes hiện tại của post
+     * 
+     * Cache Eviction:
+     * - Invalidate feed và user posts cache vì like count thay đổi
+     * 
+     * @param postId ID của post cần like
+     * @return LikeResponse với status và like count
      */
-    @org.springframework.cache.annotation.CacheEvict(value = ["feedPosts", "userPosts"], allEntries = true)
     @PostMapping("/{postId}/like")
-    fun likePost(@PathVariable postId: Long): ResponseEntity<Map<String, Any>> {
+    @org.springframework.cache.annotation.CacheEvict(
+        value = ["feedPosts", "userPosts"], 
+        allEntries = true
+    )
+    fun likePost(@PathVariable postId: Long): ResponseEntity<LikeResponse> {
         val userId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            ?: throw IllegalStateException("User not authenticated")
 
         val liked = likeService.likePost(userId, postId)
-        return ResponseEntity.ok(mapOf(
-            "success" to liked,
-            "message" to if (liked) "Post liked successfully" else "Post already liked"
-        ))
+        val likesCount = likeService.getLikeCount(postId)
+        
+        return ResponseEntity.ok(
+            LikeResponse(
+                success = liked,
+                message = if (liked) "Post liked successfully" else "Post already liked",
+                likesCount = likesCount
+            )
+        )
     }
 
     /**
      * DELETE /api/posts/{postId}/like - Unlike a post
      */
-    @org.springframework.cache.annotation.CacheEvict(value = ["feedPosts", "userPosts"], allEntries = true)
     @DeleteMapping("/{postId}/like")
-    fun unlikePost(@PathVariable postId: Long): ResponseEntity<Map<String, Any>> {
+    @org.springframework.cache.annotation.CacheEvict(
+        value = ["feedPosts", "userPosts"], 
+        allEntries = true
+    )
+    fun unlikePost(@PathVariable postId: Long): ResponseEntity<LikeResponse> {
         val userId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            ?: throw IllegalStateException("User not authenticated")
 
         val unliked = likeService.unlikePost(userId, postId)
-        return ResponseEntity.ok(mapOf(
-            "success" to unliked,
-            "message" to if (unliked) "Post unliked successfully" else "Post was not liked"
-        ))
+        val likesCount = likeService.getLikeCount(postId)
+        
+        return ResponseEntity.ok(
+            LikeResponse(
+                success = unliked,
+                message = if (unliked) "Post unliked successfully" else "Post was not liked",
+                likesCount = likesCount
+            )
+        )
     }
-
+    
+    /**
+     * GET /api/posts/{postId}/like/count - Get like count
+     */
+    @GetMapping("/{postId}/like/count")
+    fun getLikeCount(@PathVariable postId: Long): ResponseEntity<CountResponse> {
+        val count = likeService.getLikeCount(postId)
+        return ResponseEntity.ok(
+            CountResponse(
+                success = true,
+                count = count,
+                message = "Like count retrieved successfully"
+            )
+        )
+    }
+    
+    /**
+     * GET /api/posts/{postId}/like/status - Check if current user liked the post
+     */
+    @GetMapping("/{postId}/like/status")
+    fun getLikeStatus(@PathVariable postId: Long): ResponseEntity<LikeStatusResponse> {
+        val userId = SecurityUtil.getCurrentUserId()
+            ?: throw IllegalStateException("User not authenticated")
+        
+        val isLiked = likeService.isPostLikedByUser(postId, userId)
+        
+        return ResponseEntity.ok(
+            LikeStatusResponse(
+                success = true,
+                isLiked = isLiked
+            )
+        )
+    }
+    
     // Comment endpoints have been moved to CommentController
 }

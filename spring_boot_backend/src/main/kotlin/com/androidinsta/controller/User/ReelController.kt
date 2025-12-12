@@ -4,17 +4,24 @@ import com.androidinsta.Model.*
 import com.androidinsta.Repository.User.PostRepository
 import com.androidinsta.Repository.User.UserRepository
 import com.androidinsta.Service.CloudinaryService
+import com.androidinsta.Service.VideoQuality
 import com.androidinsta.config.SecurityUtil
-import com.androidinsta.dto.PostMediaFile
-import com.androidinsta.dto.PostResponse
-import com.androidinsta.dto.PostUserResponse
+import com.androidinsta.dto.*
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 
+/**
+ * REST controller cho reel operations  
+ * Handles video reel uploads, viewing, and management
+ */
 @RestController
 @RequestMapping("/api/reels")
 class ReelController(
@@ -23,96 +30,77 @@ class ReelController(
     private val cloudinaryService: CloudinaryService
 ) {
 
-    @org.springframework.cache.annotation.CacheEvict(value = ["reels", "reelDetail", "feedPosts", "userPosts"], allEntries = true)
+    /**
+     * Upload reel (video post)
+     * POST /api/reels/upload
+     */
     @PostMapping("/upload")
+    @CacheEvict(value = ["reels", "reelDetail", "feedPosts", "userPosts"], allEntries = true)
     fun uploadReel(
         @RequestParam("video") videoFile: MultipartFile,
         @RequestParam("caption", required = false) caption: String?,
-        @RequestParam("visibility", required = false, defaultValue = "PUBLIC") visibilityStr: String,
-        @RequestParam("quality", required = false, defaultValue = "HIGH") qualityStr: String
-    ): ResponseEntity<Map<String, Any>> {
+        @RequestParam("visibility", defaultValue = "PUBLIC") visibilityStr: String,
+        @RequestParam("quality", defaultValue = "HIGH") qualityStr: String
+    ): ResponseEntity<ReelUploadResponse> {
         
         if (!videoFile.contentType?.startsWith("video/")!!) {
-            return ResponseEntity.badRequest().body(
-                mapOf("success" to false, "message" to "File must be a video")
-            )
+            throw IllegalArgumentException("File must be a video")
         }
 
         if (videoFile.size > 200 * 1024 * 1024) {
-            return ResponseEntity.badRequest().body(
-                mapOf("success" to false, "message" to "Video must be less than 200MB")
-            )
+            throw IllegalArgumentException("Video must be less than 200MB")
         }
 
         val currentUserId = SecurityUtil.getCurrentUserId()
-        val user = userRepository.findById(currentUserId).orElseThrow()
+        val user = userRepository.findById(currentUserId).orElseThrow { IllegalStateException("User not found") }
 
-        try {
-            // Parse quality setting
-            val videoQuality = try {
-                com.androidinsta.Service.VideoQuality.valueOf(qualityStr.uppercase())
-            } catch (e: Exception) {
-                com.androidinsta.Service.VideoQuality.HIGH
-            }
-            
-            val uploadResult = cloudinaryService.uploadVideo(videoFile, "reels", videoQuality)
-
-            if (uploadResult.duration != null && uploadResult.duration > 900) {
-                cloudinaryService.deleteMedia(uploadResult.publicId, true)
-                return ResponseEntity.badRequest().body(
-                    mapOf("success" to false, "message" to "Video must be less than 15 minutes")
-                )
-            }
-
-            val mediaFile = MediaFile(
-                fileUrl = uploadResult.url,
-                fileType = MediaType.VIDEO,
-                orderIndex = 1,
-                cloudinaryPublicId = uploadResult.publicId,
-                duration = uploadResult.duration,
-                thumbnailUrl = uploadResult.thumbnailUrl
-            )
-
-            val post = Post(
-                user = user,
-                caption = caption,
-                visibility = Visibility.valueOf(visibilityStr.uppercase()),
-                mediaFiles = listOf(mediaFile)
-            )
-
-            val saved = postRepository.save(post)
-
-            return ResponseEntity.ok(
-                mapOf(
-                    "success" to true,
-                    "message" to "Reel uploaded successfully",
-                    "post" to PostResponse(
-                        id = saved.id,
-                        user = PostUserResponse(user.id, user.username),
-                        caption = saved.caption,
-                        visibility = saved.visibility,
-                        mediaFiles = listOf(
-                            PostMediaFile(
-                                mediaFile.fileUrl,
-                                mediaFile.fileType.name,
-                                mediaFile.orderIndex,
-                                mediaFile.duration,
-                                mediaFile.thumbnailUrl
-                            )
-                        ),
-                        createdAt = saved.createdAt,
-                        updatedAt = saved.updatedAt
-                    )
-                )
-            )
+        val videoQuality = try {
+            VideoQuality.valueOf(qualityStr.uppercase())
         } catch (e: Exception) {
-            return ResponseEntity.internalServerError().body(
-                mapOf("success" to false, "message" to "Upload failed: ${e.message}")
-            )
+            VideoQuality.HIGH
         }
+        
+        val uploadResult = cloudinaryService.uploadVideo(videoFile, "reels", videoQuality)
+
+        if (uploadResult.duration != null && uploadResult.duration > 900) {
+            cloudinaryService.deleteMedia(uploadResult.publicId, true)
+            throw IllegalArgumentException("Video must be less than 15 minutes")
+        }
+
+        val mediaFile = MediaFile(
+            fileUrl = uploadResult.url,
+            fileType = MediaType.VIDEO,
+            orderIndex = 1,
+            cloudinaryPublicId = uploadResult.publicId,
+            duration = uploadResult.duration,
+            thumbnailUrl = uploadResult.thumbnailUrl
+        )
+
+        val post = Post(
+            user = user,
+            caption = caption,
+            visibility = Visibility.valueOf(visibilityStr.uppercase()),
+            mediaFiles = listOf(mediaFile)
+        )
+
+        val saved = postRepository.save(post)
+
+        return ResponseEntity.ok(
+            ReelUploadResponse(
+                success = true,
+                message = "Reel uploaded successfully",
+                reelId = saved.id,
+                videoUrl = uploadResult.url,
+                thumbnailUrl = uploadResult.thumbnailUrl,
+                duration = uploadResult.duration
+            )
+        )
     }
 
-    @org.springframework.cache.annotation.Cacheable(value = ["reels"], key = "'page_' + #page + '_size_' + #size")
+    /**
+     * Lấy danh sách reels
+     * GET /api/reels
+     */
     @GetMapping
     fun getReels(
         @RequestParam(defaultValue = "0") page: Int,
@@ -137,18 +125,19 @@ class ReelController(
                 )
             }
         
-        return ResponseEntity.ok(
-            org.springframework.data.domain.PageImpl(reels, pageable, posts.totalElements)
-        )
+        return ResponseEntity.ok(PageImpl(reels, pageable, posts.totalElements))
     }
 
-    @org.springframework.cache.annotation.Cacheable(value = ["reelDetail"], key = "#id")
+    /**
+     * Lấy reel by ID
+     * GET /api/reels/{id}
+     */
     @GetMapping("/{id}")
     fun getReelById(@PathVariable id: Long): ResponseEntity<PostResponse> {
-        val post = postRepository.findById(id).orElseThrow()
+        val post = postRepository.findById(id).orElseThrow { IllegalStateException("Reel not found") }
         
         if (post.mediaFiles.none { it.fileType == MediaType.VIDEO }) {
-            return ResponseEntity.badRequest().build()
+            throw IllegalArgumentException("This is not a reel")
         }
 
         return ResponseEntity.ok(
@@ -166,14 +155,18 @@ class ReelController(
         )
     }
 
-    @org.springframework.cache.annotation.CacheEvict(value = ["reels", "reelDetail", "feedPosts", "userPosts"], allEntries = true)
+    /**
+     * Xóa reel
+     * DELETE /api/reels/{id}
+     */
     @DeleteMapping("/{id}")
+    @CacheEvict(value = ["reels", "reelDetail", "feedPosts", "userPosts"], allEntries = true)
     fun deleteReel(@PathVariable id: Long): ResponseEntity<Map<String, String>> {
         val currentUserId = SecurityUtil.getCurrentUserId()
-        val post = postRepository.findById(id).orElseThrow()
+        val post = postRepository.findById(id).orElseThrow { IllegalStateException("Reel not found") }
 
         if (post.user.id != currentUserId) {
-            return ResponseEntity.status(403).body(mapOf("message" to "Forbidden"))
+            throw IllegalStateException("You don't have permission to delete this reel")
         }
 
         post.mediaFiles.forEach { media ->

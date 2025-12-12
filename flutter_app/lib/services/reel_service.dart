@@ -16,9 +16,9 @@ class ReelService {
   /// Upload reel video with metadata
   static Future<Map<String, dynamic>> uploadReel({
     required File videoFile,
-    required String caption,
-    String? musicName,
-    String? musicArtist,
+    String caption = '',
+    String visibility = 'PUBLIC',
+    String quality = 'HIGH',
   }) async {
     final token = await _getToken();
     if (token == null) throw Exception('Not authenticated');
@@ -27,17 +27,18 @@ class ReelService {
     request.headers['Authorization'] = 'Bearer $token';
     
     request.files.add(await http.MultipartFile.fromPath('video', videoFile.path));
-    request.fields['caption'] = caption;
-    if (musicName != null) request.fields['musicName'] = musicName;
-    if (musicArtist != null) request.fields['musicArtist'] = musicArtist;
+    if (caption.isNotEmpty) request.fields['caption'] = caption;
+    request.fields['visibility'] = visibility;
+    request.fields['quality'] = quality;
 
     final response = await request.send();
     final responseData = await response.stream.bytesToString();
     
-    if (response.statusCode == 201) {
+    if (response.statusCode == 200) {
       return jsonDecode(responseData);
     } else {
-      throw Exception('Failed to upload reel');
+      final error = jsonDecode(responseData);
+      throw Exception(error['message'] ?? 'Failed to upload reel');
     }
   }
 

@@ -1,22 +1,25 @@
 package com.androidinsta.dto
 
 import com.androidinsta.Model.User
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDateTime
 
 /**
  * DTO for admin user list view
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class AdminUserDto(
-    val id: Long,
-    val username: String,
-    val email: String,
-    val fullName: String?,
-    val avatarUrl: String?,
-    val isVerified: Boolean,
-    val isActive: Boolean,
-    val roleName: String,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime?
+    @JsonProperty("id") val id: Long,
+    @JsonProperty("username") val username: String,
+    @JsonProperty("email") val email: String,
+    @JsonProperty("fullName") val fullName: String?,
+    @JsonProperty("avatarUrl") val avatarUrl: String?,
+    @JsonProperty("isVerified") val isVerified: Boolean,
+    @JsonProperty("isActive") val isActive: Boolean,
+    @JsonProperty("roleName") val roleName: String,
+    @JsonProperty("createdAt") val createdAt: LocalDateTime,
+    @JsonProperty("updatedAt") val updatedAt: LocalDateTime?
 ) {
     companion object {
         fun fromUser(user: User): AdminUserDto {
@@ -58,88 +61,95 @@ data class AdminUserDto(
 /**
  * DTO for admin user detail view with statistics
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class AdminUserDetailDto(
-    val id: Long,
-    val username: String,
-    val email: String,
-    val fullName: String?,
-    val bio: String?,
-    val avatarUrl: String?,
-    val isVerified: Boolean,
-    val isActive: Boolean,
-    val roleName: String,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime?,
-    val postsCount: Int,
-    val followersCount: Int,
-    val followingCount: Int
+    @JsonProperty("id") val id: Long,
+    @JsonProperty("username") val username: String,
+    @JsonProperty("email") val email: String,
+    @JsonProperty("fullName") val fullName: String?,
+    @JsonProperty("bio") val bio: String?,
+    @JsonProperty("avatarUrl") val avatarUrl: String?,
+    @JsonProperty("isVerified") val isVerified: Boolean,
+    @JsonProperty("isActive") val isActive: Boolean,
+    @JsonProperty("roleName") val roleName: String,
+    @JsonProperty("createdAt") val createdAt: LocalDateTime,
+    @JsonProperty("updatedAt") val updatedAt: LocalDateTime?,
+    @JsonProperty("postsCount") val postsCount: Int,
+    @JsonProperty("followersCount") val followersCount: Int,
+    @JsonProperty("followingCount") val followingCount: Int
 )
 
 /**
  * DTO for user statistics
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class AdminUserStatsDto(
-    val userId: Long,
-    val username: String,
-    val postsCount: Long,
-    val followersCount: Long,
-    val followingCount: Long,
-    val likesGivenCount: Long,
-    val likesReceivedCount: Long,
-    val commentsGivenCount: Long,
-    val commentsReceivedCount: Long
+    @JsonProperty("userId") val userId: Long,
+    @JsonProperty("username") val username: String,
+    @JsonProperty("postsCount") val postsCount: Long,
+    @JsonProperty("followersCount") val followersCount: Long,
+    @JsonProperty("followingCount") val followingCount: Long,
+    @JsonProperty("likesGivenCount") val likesGivenCount: Long,
+    @JsonProperty("likesReceivedCount") val likesReceivedCount: Long,
+    @JsonProperty("commentsGivenCount") val commentsGivenCount: Long,
+    @JsonProperty("commentsReceivedCount") val commentsReceivedCount: Long
 )
 
 /**
  * DTO for system overview statistics
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class AdminOverviewStatsDto(
-    val totalUsers: Long,
-    val activeUsers: Long,
-    val verifiedUsers: Long,
-    val totalPosts: Long,
-    val totalLikes: Long,
-    val totalComments: Long,
-    val totalFollows: Long,
-    val newUsersToday: Long,
-    val newPostsToday: Long
+    @JsonProperty("totalUsers") val totalUsers: Long,
+    @JsonProperty("activeUsers") val activeUsers: Long,
+    @JsonProperty("verifiedUsers") val verifiedUsers: Long,
+    @JsonProperty("totalPosts") val totalPosts: Long,
+    @JsonProperty("totalLikes") val totalLikes: Long,
+    @JsonProperty("totalComments") val totalComments: Long,
+    @JsonProperty("totalFollows") val totalFollows: Long,
+    @JsonProperty("newUsersToday") val newUsersToday: Long,
+    @JsonProperty("newPostsToday") val newPostsToday: Long
 )
 
 /**
  * DTO for time-based statistics
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class AdminTimeStatsDto(
-    val period: String,
-    val data: List<AdminTimeDataPoint>
+    @JsonProperty("period") val period: String,
+    @JsonProperty("data") val data: List<AdminTimeDataPoint>
 )
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class AdminTimeDataPoint(
-    val date: String,
-    val count: Long
+    @JsonProperty("date") val date: String,
+    @JsonProperty("count") val count: Long
 )
 
 /**
  * DTO for top users
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class AdminTopUserDto(
-    val id: Long,
-    val username: String,
-    val fullName: String?,
-    val avatarUrl: String?,
-    val isVerified: Boolean,
-    val count: Long,
-    val type: String // "followers", "posts", "likes"
+    @JsonProperty("id") val id: Long,
+    @JsonProperty("username") val username: String,
+    @JsonProperty("fullName") val fullName: String?,
+    @JsonProperty("avatarUrl") val avatarUrl: String?,
+    @JsonProperty("isVerified") val isVerified: Boolean,
+    @JsonProperty("count") val count: Long,
+    @JsonProperty("type") val type: String // "followers", "posts", "likes"
 )
 
 /**
  * DTO for top posts
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class AdminTopPostDto(
-    val id: Long,
-    val caption: String?,
-    val username: String,
-    val userId: Long,
-    val likesCount: Long,
-    val commentsCount: Long,
-    val createdAt: LocalDateTime
+    @JsonProperty("id") val id: Long,
+    @JsonProperty("caption") val caption: String?,
+    @JsonProperty("username") val username: String,
+    @JsonProperty("userId") val userId: Long,
+    @JsonProperty("likesCount") val likesCount: Long,
+    @JsonProperty("commentsCount") val commentsCount: Long,
+    @JsonProperty("createdAt") val createdAt: LocalDateTime
 )

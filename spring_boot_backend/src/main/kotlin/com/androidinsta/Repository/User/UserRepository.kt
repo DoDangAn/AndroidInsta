@@ -27,8 +27,21 @@ interface UserRepository : JpaRepository<User, Long> {
     // Kiểm tra email đã tồn tại
     fun existsByEmail(email: String): Boolean
     
-    // Query custom - tìm kiếm theo username, email, hoặc fullName
-    @Query("SELECT u FROM User u WHERE u.username LIKE %:keyword% OR u.email LIKE %:keyword% OR u.fullName LIKE %:keyword%")
+    // Query custom - tìm kiếm theo username, fullName (không search email vì bảo mật)
+    // Optimize: Chỉ search username và fullName, không expose email trong search
+    @Query("""
+        SELECT DISTINCT u FROM User u 
+        WHERE u.isActive = true 
+        AND (LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')) 
+             OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')))
+        ORDER BY 
+            CASE 
+                WHEN LOWER(u.username) = LOWER(:keyword) THEN 0
+                WHEN LOWER(u.username) LIKE LOWER(CONCAT(:keyword, '%')) THEN 1
+                ELSE 2
+            END,
+            u.isVerified DESC
+    """)
     fun searchUsers(keyword: String): List<User>
     
     // Search with pagination

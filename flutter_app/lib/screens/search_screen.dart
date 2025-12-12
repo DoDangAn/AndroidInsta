@@ -10,7 +10,7 @@ import 'user_profile_screen.dart';
 import 'post_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({Key? key}) : super(key: key);
+  const SearchScreen({super.key});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -68,15 +68,15 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Future<void> _loadRecentPosts() async {
-    print('=== LOADING RECENT POSTS ===');
+    print('=== LOADING RECENT PUBLIC POSTS (LAST 7 DAYS) ===');
     setState(() {
       _isLoadingRecent = true;
     });
     
     try {
-      print('Calling PostService.getAdvertisePosts...');
+      print('Calling PostService.getAdvertisePosts (recent PUBLIC posts)...');
       final response = await PostService.getAdvertisePosts(page: 0, size: 20);
-      print('Response received: ${response.posts.length} posts');
+      print('Response received: ${response.posts.length} recent posts');
       setState(() {
         _recentPosts = response.posts;
         _isLoadingRecent = false;
@@ -282,8 +282,8 @@ class _SearchScreenState extends State<SearchScreen>
     return ListView(
       children: [
         if (_suggestions!.users.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.all(16),
+          const Padding(
+            padding: EdgeInsets.all(16),
             child: Text(
               'Accounts',
               style: TextStyle(
@@ -295,8 +295,8 @@ class _SearchScreenState extends State<SearchScreen>
           ..._suggestions!.users.map((user) => _buildUserSuggestionItem(user)),
         ],
         if (_suggestions!.tags.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.all(16),
+          const Padding(
+            padding: EdgeInsets.all(16),
             child: Text(
               'Tags',
               style: TextStyle(
@@ -850,7 +850,7 @@ class _SearchScreenState extends State<SearchScreen>
         leading: Container(
           width: 50,
           height: 50,
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [Colors.blue, Colors.purple],
               begin: Alignment.topLeft,

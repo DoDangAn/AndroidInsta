@@ -1,4 +1,4 @@
-package com.androidinsta.Repository
+package com.androidinsta.Repository.User
 
 import com.androidinsta.Model.Message
 import org.springframework.data.domain.Page

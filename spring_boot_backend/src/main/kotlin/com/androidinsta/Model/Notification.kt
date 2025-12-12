@@ -7,7 +7,8 @@ enum class NotificationType {
     LIKE,       // Ai đó thích bài viết của bạn
     COMMENT,    // Ai đó comment vào bài viết của bạn
     FOLLOW,     // Ai đó follow bạn
-    MESSAGE     // Ai đó gửi tin nhắn cho bạn
+    MESSAGE,    // Ai đó gửi tin nhắn cho bạn
+    NEW_POST    // Người bạn follow đăng bài mới
 }
 
 @Entity
@@ -15,7 +16,6 @@ enum class NotificationType {
 data class Notification(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(columnDefinition = "BIGINT UNSIGNED")
     val id: Long = 0,
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -27,10 +27,10 @@ data class Notification(
     val receiver: User,
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "ENUM('LIKE', 'COMMENT', 'FOLLOW', 'MESSAGE')")
+    @Column(nullable = false, columnDefinition = "ENUM('LIKE', 'COMMENT', 'FOLLOW', 'MESSAGE', 'NEW_POST')")
     val type: NotificationType,
 
-    @Column(name = "entity_id", columnDefinition = "BIGINT UNSIGNED")
+    @Column(name = "entity_id")
     val entityId: Long? = null,
 
     @Column(name = "is_read", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")

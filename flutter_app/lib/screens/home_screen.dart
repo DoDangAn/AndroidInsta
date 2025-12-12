@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/post_service.dart';
-import '../services/friend_service.dart';
+import '../services/user_service.dart';
 import '../models/post_models.dart';
-import '../models/friend_models.dart';
+import '../models/user_models.dart';
 import 'create_post_screen.dart';
 import 'profile_screen.dart';
 import 'user_profile_screen.dart';
@@ -23,34 +23,38 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   List<PostDto> _posts = [];
-  List<Friend> _friends = [];
+  List<UserProfile> _following = [];
   bool _isLoading = true;
-  bool _isFriendsLoading = true;
+  bool _isFollowingLoading = true;
   int _userId = 0;
-  final FriendService _friendService = FriendService();
 
   @override
   void initState() {
     super.initState();
     _loadUserId();
     _loadPosts();
-    _loadFriends();
+    _loadFollowing();
   }
 
-  Future<void> _loadFriends() async {
+  Future<void> _loadFollowing() async {
     try {
-      final friends = await _friendService.getFriends();
+      if (_userId == 0) {
+        final prefs = await SharedPreferences.getInstance();
+        _userId = prefs.getInt('user_id') ?? 0;
+      }
+      
+      final following = await UserService.getFollowing(_userId);
       if (mounted) {
         setState(() {
-          _friends = friends;
-          _isFriendsLoading = false;
+          _following = following;
+          _isFollowingLoading = false;
         });
       }
     } catch (e) {
-      print('Error loading friends: $e');
+      print('Error loading following: $e');
       if (mounted) {
         setState(() {
-          _isFriendsLoading = false;
+          _isFollowingLoading = false;
         });
       }
     }
@@ -169,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onRefresh: () async {
         await Future.wait([
           _loadPosts(),
-          _loadFriends(),
+          _loadFollowing(),
         ]);
       },
       child: CustomScrollView(
@@ -248,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStoriesRow() {
-    if (_isFriendsLoading) {
+    if (_isFollowingLoading) {
       return Container(
         height: 100,
         margin: const EdgeInsets.only(top: 8, bottom: 8),
@@ -261,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.only(top: 8, bottom: 8),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: _friends.length + 1, // +1 for "Your story"
+        itemCount: _following.length + 1, // +1 for "Your story"
         itemBuilder: (context, index) {
           if (index == 0) {
             // Your story button
@@ -305,13 +309,13 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          final friend = _friends[index - 1];
+          final following = _following[index - 1];
           return GestureDetector(
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => UserProfileScreen(userId: friend.userId),
+                  builder: (context) => UserProfileScreen(userId: following.id),
                 ),
               );
             },
@@ -333,12 +337,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.all(2),
                       child: CircleAvatar(
                         radius: 30,
-                        backgroundImage: friend.avatarUrl != null
-                            ? NetworkImage(friend.avatarUrl!)
+                        backgroundImage: following.avatarUrl != null
+                            ? NetworkImage(following.avatarUrl!)
                             : null,
-                        child: friend.avatarUrl == null
+                        child: following.avatarUrl == null
                             ? Text(
-                                friend.username[0].toUpperCase(),
+                                following.username[0].toUpperCase(),
                                 style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -352,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   SizedBox(
                     width: 70,
                     child: Text(
-                      friend.fullName ?? friend.username,
+                      following.fullName ?? following.username,
                       style: const TextStyle(fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
@@ -615,32 +619,57 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           if (post.mediaFiles.isNotEmpty && post.mediaFiles[0].fileUrl.isNotEmpty)
-            Image.network(
-              post.mediaFiles[0].fileUrl,
-              width: double.infinity,
-              height: 400,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                height: 400,
-                color: Colors.grey[200],
-                child: const Center(
-                  child: Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
-                ),
-              ),
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
-                  height: 400,
-                  color: Colors.grey[200],
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Debug: Print URL
+                if (post.mediaFiles[0].fileUrl.isNotEmpty)
+                  Builder(
+                    builder: (context) {
+                      print('🖼️ Image URL: ${post.mediaFiles[0].fileUrl}');
+                      return const SizedBox.shrink();
+                    },
                   ),
-                );
-              },
+                Image.network(
+                  post.mediaFiles[0].fileUrl,
+                  width: double.infinity,
+                  height: 400,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    print('❌ Image load error: $error');
+                    print('URL: ${post.mediaFiles[0].fileUrl}');
+                    return Container(
+                      height: 400,
+                      color: Colors.grey[200],
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Failed to load image',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 400,
+                      color: Colors.grey[200],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             )
           else
             Container(

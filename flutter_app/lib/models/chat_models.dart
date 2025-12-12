@@ -34,10 +34,24 @@ class Conversation {
   });
   
   factory Conversation.fromJson(Map<String, dynamic> json) {
+    // Backend returns: userId, username, fullName, avatarUrl, lastMessage (String), lastMessageTime, unreadCount
     return Conversation(
-      user: UserSummary.fromJson(json['user']),
-      lastMessage: json['lastMessage'] != null 
-          ? ChatMessage.fromJson(json['lastMessage'])
+      user: UserSummary(
+        id: json['userId'] ?? 0,
+        username: json['username'] ?? '',
+        fullName: json['fullName'],
+        avatarUrl: json['avatarUrl'],
+      ),
+      lastMessage: json['lastMessage'] != null && json['lastMessageTime'] != null
+          ? ChatMessage(
+              id: 0, // Not provided
+              content: json['lastMessage'],
+              messageType: 'text',
+              sender: UserSummary(id: json['userId'] ?? 0, username: json['username'] ?? ''),
+              receiver: UserSummary(id: 0, username: ''),
+              isRead: false,
+              createdAt: json['lastMessageTime'] ?? DateTime.now().toIso8601String(),
+            )
           : null,
       unreadCount: json['unreadCount'] ?? 0,
     );

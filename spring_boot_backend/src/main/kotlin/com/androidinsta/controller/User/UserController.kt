@@ -1,15 +1,21 @@
-package com.androidinsta.controller
+package com.androidinsta.controller.User
 
 import com.androidinsta.dto.*
 import com.androidinsta.Model.User
 import com.androidinsta.Repository.User.UserRepository
 import com.androidinsta.config.SecurityUtil
+import com.androidinsta.Service.FollowService
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDateTime
 
+/**
+ * REST controller cho user operations
+ * Handles user profiles, search, follow/unfollow functionality
+ */
 @RestController
 @RequestMapping("/api/users")
 @CrossOrigin(origins = ["*"])
@@ -17,253 +23,186 @@ class UserController(
     private val userRepository: UserRepository,
     private val securityUtil: SecurityUtil,
     private val passwordEncoder: PasswordEncoder,
-    private val followService: com.androidinsta.Service.FollowService
+    private val followService: FollowService
 ) {
 
+    /**
+     * Lấy profile của current user
+     * GET /api/users/profile
+     */
     @GetMapping("/profile")
-    fun getCurrentUserProfile(): ResponseEntity<*> {
-        return try {
-            val userId = securityUtil.getCurrentUserId()
-                ?: throw RuntimeException("User not authenticated")
+    fun getCurrentUserProfile(): ResponseEntity<UserProfileResponse> {
+        val userId = securityUtil.getCurrentUserId()
+            ?: throw IllegalStateException("User not authenticated")
 
-            val user = userRepository.findById(userId)
-                .orElseThrow { RuntimeException("User not found") }
+        val user = userRepository.findById(userId)
+            .orElseThrow { IllegalStateException("User not found") }
 
-            val userResponse = user.toResponse()
-
-            ResponseEntity.ok(
-                mapOf(
-                    "success" to true,
-                    "message" to "Profile retrieved successfully",
-                    "data" to userResponse
-                )
+        return ResponseEntity.ok(
+            UserProfileResponse(
+                success = true,
+                message = "Profile retrieved successfully",
+                data = user.toProfileData()
             )
-        } catch (e: Exception) {
-            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                mapOf(
-                    "success" to false,
-                    "message" to (e.message ?: "Failed to get profile")
-                )
-            )
-        }
-    }
-
-    @GetMapping("/{userId}")
-    @org.springframework.cache.annotation.Cacheable(value = ["userProfile"], key = "#userId")
-    fun getUserById(@PathVariable userId: Long): ResponseEntity<*> {
-        return try {
-            val user = userRepository.findById(userId)
-                .orElseThrow { RuntimeException("User not found") }
-
-            val userResponse = user.toResponse()
-
-            ResponseEntity.ok(
-                mapOf(
-                    "success" to true,
-                    "message" to "User retrieved successfully",
-                    "data" to userResponse
-                )
-            )
-        } catch (e: Exception) {
-            ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                mapOf(
-                    "success" to false,
-                    "message" to (e.message ?: "User not found")
-                )
-            )
-        }
-    }
-
-    @GetMapping("/search")
-    fun searchUsers(@RequestParam keyword: String): ResponseEntity<*> {
-        return try {
-            val users = userRepository.searchUsers(keyword)
-
-            val userResponses = users.map { it.toResponse() }
-
-            ResponseEntity.ok(
-                mapOf(
-                    "success" to true,
-                    "message" to "Users found",
-                    "data" to userResponses,
-                    "count" to userResponses.size
-                )
-            )
-        } catch (e: Exception) {
-            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                mapOf(
-                    "success" to false,
-                    "message" to (e.message ?: "Search failed")
-                )
-            )
-        }
+        )
     }
 
     /**
-     * POST /api/users/{userId}/follow - Follow a user
+     * Lấy user profile by ID
+     * GET /api/users/{userId}
+     */
+    @GetMapping("/{userId}")
+    fun getUserById(@PathVariable userId: Long): ResponseEntity<UserProfileResponse> {
+        val user = userRepository.findById(userId)
+            .orElseThrow { IllegalStateException("User not found") }
+
+        return ResponseEntity.ok(
+            UserProfileResponse(
+                success = true,
+                message = "User retrieved successfully",
+                data = user.toProfileData()
+            )
+        )
+    }
+
+    /**
+     * Tìm kiếm users
+     * GET /api/users/search?keyword=john
+     */
+    @GetMapping("/search")
+    fun searchUsers(@RequestParam keyword: String): ResponseEntity<UserListResponse> {
+        val users = userRepository.searchUsers(keyword)
+        val userProfiles = users.map { it.toProfileData() }
+
+        return ResponseEntity.ok(
+            UserListResponse(
+                success = true,
+                message = "Users found",
+                data = userProfiles,
+                count = userProfiles.size
+            )
+        )
+    }
+
+    /**
+     * Follow một user
+     * POST /api/users/{userId}/follow
      */
     @PostMapping("/{userId}/follow")
-    fun followUser(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
-// duplicate block removed
-        val currentUserId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf(
-                "success" to false,
-                "message" to "Unauthorized"
-            ))
+    fun followUser(@PathVariable userId: Long): ResponseEntity<FollowResponse> {
+        val currentUserId = securityUtil.getCurrentUserId()
+            ?: throw IllegalStateException("User not authenticated")
 
-        return try {
-            val followed = followService.followUser(currentUserId, userId)
-            ResponseEntity.ok(mapOf(
-                "success" to followed,
-                "message" to if (followed) "User followed successfully" else "Already following this user"
-            ))
-        } catch (e: Exception) {
-            ResponseEntity.badRequest().body(mapOf(
-                "success" to false,
-                "message" to (e.message ?: "Follow failed")
-            ))
-        }
+        val followed = followService.followUser(currentUserId, userId)
+        return ResponseEntity.ok(
+            FollowResponse(
+                success = followed,
+                message = if (followed) "User followed successfully" else "Already following this user",
+                isFollowing = followed
+            )
+        )
     }
 
     /**
-     * DELETE /api/users/{userId}/follow - Unfollow a user
+     * Unfollow một user
+     * DELETE /api/users/{userId}/follow
      */
     @DeleteMapping("/{userId}/follow")
-    fun unfollowUser(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
-        val currentUserId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf(
-                "success" to false,
-                "message" to "Unauthorized"
-            ))
+    fun unfollowUser(@PathVariable userId: Long): ResponseEntity<FollowResponse> {
+        val currentUserId = securityUtil.getCurrentUserId()
+            ?: throw IllegalStateException("User not authenticated")
 
-        return try {
-            val unfollowed = followService.unfollowUser(currentUserId, userId)
-            ResponseEntity.ok(mapOf(
-                "success" to unfollowed,
-                "message" to if (unfollowed) "User unfollowed successfully" else "Not following this user"
-            ))
-        } catch (e: Exception) {
-            ResponseEntity.badRequest().body(mapOf(
-                "success" to false,
-                "message" to (e.message ?: "Unfollow failed")
-            ))
-        }
-    }
-    @GetMapping("/{userId}/followers")
-    fun getFollowers(@PathVariable userId: Long): ResponseEntity<*> {
-        return try {
-            val followers = followService.getFollowers(userId)
-            val response = followers.map { it.toResponse() }
-            ResponseEntity.ok(mapOf("success" to true, "data" to response))
-        } catch (e: Exception) {
-            ResponseEntity.badRequest().body(mapOf("success" to false, "message" to e.message))
-        }
+        val unfollowed = followService.unfollowUser(currentUserId, userId)
+        return ResponseEntity.ok(
+            FollowResponse(
+                success = unfollowed,
+                message = if (unfollowed) "User unfollowed successfully" else "Not following this user",
+                isFollowing = false
+            )
+        )
     }
 
     /**
-     * GET /api/users/{userId}/following - Get following list
+     * Lấy danh sách followers
+     * GET /api/users/{userId}/followers
+     */
+    @GetMapping("/{userId}/followers")
+    fun getFollowers(@PathVariable userId: Long): ResponseEntity<UserListResponse> {
+        val followers = followService.getFollowers(userId)
+        val response = followers.map { it.toProfileData() }
+        return ResponseEntity.ok(UserListResponse(success = true, data = response, count = response.size))
+    }
+
+    /**
+     * Lấy danh sách following
+     * GET /api/users/{userId}/following
      */
     @GetMapping("/{userId}/following")
-    fun getFollowing(@PathVariable userId: Long): ResponseEntity<*> {
-        return try {
-            val following = followService.getFollowing(userId)
-            val response = following.map { it.toResponse() }
-            ResponseEntity.ok(mapOf("success" to true, "data" to response))
-        } catch (e: Exception) {
-            ResponseEntity.badRequest().body(mapOf("success" to false, "message" to e.message))
-        }
+    fun getFollowing(@PathVariable userId: Long): ResponseEntity<UserListResponse> {
+        val following = followService.getFollowing(userId)
+        val response = following.map { it.toProfileData() }
+        return ResponseEntity.ok(UserListResponse(success = true, data = response, count = response.size))
     }
 
     /**
-     * PUT /api/users/profile - Update current user's profile
+     * Cập nhật profile của current user
+     * PUT /api/users/profile
      */
     @PutMapping("/profile")
-    fun updateProfile(@RequestBody request: UpdateUserRequest): ResponseEntity<*> {
-        return try {
-            val userId = securityUtil.getCurrentUserId()
-                ?: throw RuntimeException("User not authenticated")
+    fun updateProfile(@Valid @RequestBody request: UpdateUserRequest): ResponseEntity<UpdateProfileResponse> {
+        val userId = securityUtil.getCurrentUserId()
+            ?: throw IllegalStateException("User not authenticated")
 
-            val user = userRepository.findById(userId)
-                .orElseThrow { RuntimeException("User not found") }
+        val user = userRepository.findById(userId)
+            .orElseThrow { IllegalStateException("User not found") }
 
-            // Create updated user with new values
-            val updatedUser = user.copy(
-                fullName = request.fullName ?: user.fullName,
-                bio = request.bio ?: user.bio,
-                email = request.email ?: user.email,
-                avatarUrl = request.avatarUrl ?: user.avatarUrl,
-                updatedAt = LocalDateTime.now()
+        val updatedUser = user.copy(
+            fullName = request.fullName ?: user.fullName,
+            bio = request.bio ?: user.bio,
+            email = request.email ?: user.email,
+            avatarUrl = request.avatarUrl ?: user.avatarUrl,
+            updatedAt = LocalDateTime.now()
+        )
+
+        val savedUser = userRepository.save(updatedUser)
+
+        return ResponseEntity.ok(
+            UpdateProfileResponse(
+                success = true,
+                message = "Profile updated successfully",
+                data = savedUser.toProfileData()
             )
-
-            // Save updated user
-            val savedUser = userRepository.save(updatedUser)
-
-            val userResponse = savedUser.toResponse()
-
-            ResponseEntity.ok(
-                mapOf(
-                    "success" to true,
-                    "message" to "Profile updated successfully",
-                    "data" to userResponse
-                )
-            )
-        } catch (e: Exception) {
-            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                mapOf(
-                    "success" to false,
-                    "message" to (e.message ?: "Failed to update profile")
-                )
-            )
-        }
+        )
     }
 
     /**
-     * GET /api/users/{userId}/follow-status - Check if current user follows this user
+     * Kiểm tra follow status với một user
+     * GET /api/users/{userId}/follow-status
      */
     @GetMapping("/{userId}/follow-status")
-    fun getFollowStatus(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
-        val currentUserId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf(
-                "success" to false,
-                "message" to "Unauthorized"
-            ))
+    fun getFollowStatus(@PathVariable userId: Long): ResponseEntity<FollowStatusResponse> {
+        val currentUserId = securityUtil.getCurrentUserId()
+            ?: throw IllegalStateException("User not authenticated")
 
-        return try {
-            val isFollowing = followService.isFollowing(currentUserId, userId)
-            ResponseEntity.ok(mapOf(
-                "success" to true,
-                "isFollowing" to isFollowing
-            ))
-        } catch (e: Exception) {
-            ResponseEntity.badRequest().body(mapOf(
-                "success" to false,
-                "message" to (e.message ?: "Failed to get follow status")
-            ))
-        }
+        val isFollowing = followService.isFollowing(currentUserId, userId)
+        val isFollower = followService.isFollowing(userId, currentUserId)
+        
+        return ResponseEntity.ok(
+            FollowStatusResponse(
+                success = true,
+                isFollowing = isFollowing,
+                isFollower = isFollower
+            )
+        )
     }
 
     /**
-     * GET /api/users/{userId}/stats - Get user statistics
+     * Lấy user statistics
+     * GET /api/users/{userId}/stats
      */
     @GetMapping("/{userId}/stats")
-    fun getUserStats(@PathVariable userId: Long): ResponseEntity<Map<String, Any>> {
-        return try {
-            val followersCount = followService.getFollowersCount(userId)
-            val followingCount = followService.getFollowingCount(userId)
-            // For now, return 0 for posts count - can be implemented later
-            val postsCount = 0L
-
-            ResponseEntity.ok(mapOf(
-                "success" to true,
-                "followersCount" to followersCount,
-                "followingCount" to followingCount,
-                "postsCount" to postsCount
-            ))
-        } catch (e: Exception) {
-            ResponseEntity.badRequest().body(mapOf(
-                "success" to false,
-                "message" to (e.message ?: "Failed to get stats")
-            ))
-        }
+    fun getUserStats(@PathVariable userId: Long): ResponseEntity<UserStatsDto> {
+        val stats = followService.getUserStats(userId)
+        return ResponseEntity.ok(stats)
     }
 }

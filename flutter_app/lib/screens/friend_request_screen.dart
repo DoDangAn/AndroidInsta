@@ -3,7 +3,7 @@ import '../services/friend_service.dart';
 import '../models/friend_models.dart';
 
 class FriendRequestScreen extends StatefulWidget {
-  const FriendRequestScreen({Key? key}) : super(key: key);
+  const FriendRequestScreen({super.key});
 
   @override
   State<FriendRequestScreen> createState() => _FriendRequestScreenState();

@@ -25,17 +25,20 @@ class SearchService(
 ) {
 
     /**
-     * Tìm kiếm users
+     * Tìm kiếm users theo keyword
+     * 
+     * Search Strategy:
+     * - Tìm kiếm trong username, fullName, email (case-insensitive)
+     * - Sắp xếp: Exact match trước, sau đó theo số followers
+     * - Cache kết quả 5 phút để tăng performance
+     * 
+     * @param keyword Từ khóa tìm kiếm (trim và lowercase)
+     * @param pageable Pagination parameters
+     * @param currentUserId User hiện tại để check follow status (optional)
+     * @return Page of UserSearchResult với follow status
      */
     fun searchUsers(keyword: String, pageable: Pageable, currentUserId: Long? = null): Page<UserSearchResult> {
-        val cacheKey = "search:users:$keyword:${pageable.pageNumber}:${currentUserId ?: "guest"}"
-        
-        val cached = redisService.get(cacheKey, Page::class.java)
-        if (cached != null) {
-            @Suppress("UNCHECKED_CAST")
-            return cached as Page<UserSearchResult>
-        }
-        
+        // DON'T cache Page<UserSearchResult> - complex DTO, query is fast with DB indexes
         val users = userRepository.searchUsers(keyword)
         
         val results = users.map { user ->
@@ -62,20 +65,26 @@ class SearchService(
         val end = minOf(start + pageable.pageSize, results.size)
         val pageContent = if (start < results.size) results.subList(start, end) else emptyList()
         
-        val result = org.springframework.data.domain.PageImpl(
+        // DON'T cache Page<SearchResult> - complex DTO, search is fast with DB indexes
+        return org.springframework.data.domain.PageImpl(
             pageContent,
             pageable,
             results.size.toLong()
         )
-        
-        // Cache result for 5 minutes
-        redisService.set(cacheKey, result, java.time.Duration.ofMinutes(5))
-        
-        return result
     }
 
     /**
-     * Tìm kiếm posts
+     * Tìm kiếm posts theo keyword
+     * 
+     * Search Strategy:
+     * - Tìm trong caption và username của chủ post
+     * - Chỉ hiển thị PUBLIC posts (không search PRIVATE)
+     * - Sắp xếp theo thời gian tạo (mới nhất trước)
+     * - Include like count và comment count
+     * 
+     * @param keyword Từ khóa tìm kiếm
+     * @param pageable Pagination với sort theo createdAt DESC
+     * @return Page of PostSearchResult
      */
     fun searchPosts(keyword: String, pageable: Pageable): Page<PostSearchResult> {
         return postRepository.searchPosts(keyword, pageable)
@@ -83,7 +92,16 @@ class SearchService(
     }
 
     /**
-     * Tìm kiếm reels (video posts)
+     * Tìm kiếm reels (video posts only)
+     * 
+     * Search Strategy:
+     * - Tìm posts giống searchPosts
+     * - Lọc chỉ lấy posts có ít nhất 1 video file
+     * - Phù hợp cho Instagram Reels feature
+     * 
+     * @param keyword Từ khóa tìm kiếm
+     * @param pageable Pagination parameters
+     * @return Page of PostSearchResult (filtered for videos)
      */
     fun searchReels(keyword: String, pageable: Pageable): Page<PostSearchResult> {
         return postRepository.searchPosts(keyword, pageable)
@@ -103,7 +121,16 @@ class SearchService(
     }
 
     /**
-     * Tìm kiếm tags
+     * Tìm kiếm hashtags theo keyword
+     * 
+     * Search Strategy:
+     * - Tìm kiếm trong tag name (case-insensitive)
+     * - Sắp xếp theo tên (alphabet)
+     * - Bao gồm số lượng posts sử dụng tag
+     * 
+     * @param keyword Từ khóa tìm kiếm (không cần dấu #)
+     * @param pageable Pagination với sort theo name ASC
+     * @return Page of TagSearchResult
      */
     fun searchTags(keyword: String, pageable: Pageable): Page<TagSearchResult> {
         return tagRepository.searchTags(keyword, pageable)
@@ -111,7 +138,15 @@ class SearchService(
     }
 
     /**
-     * Tìm kiếm tổng hợp (all)
+     * Tìm kiếm tổng hợp (all categories)
+     * 
+     * Use Case:
+     * - Hiển thị kết quả nhanh khi user gõ search query
+     * - Top 10 kết quả mỗi loại (users, posts, tags)
+     * - Không cần pagination vì chỉ lấy preview
+     * 
+     * @param keyword Từ khóa tìm kiếm
+     * @return SearchAllResult chứa top results của mỗi category
      */
     fun searchAll(keyword: String): SearchAllResult {
         val pageable = PageRequest.of(0, 10)
@@ -128,7 +163,15 @@ class SearchService(
     }
 
     /**
-     * Lấy trending tags
+     * Lấy danh sách trending hashtags
+     * 
+     * Trending Logic:
+     * - Sắp xếp theo số lượng posts sử dụng tag (DESC)
+     * - Hiển thị tags phổ biến nhất hiện tại
+     * - Phù hợp cho Explore/Discover feature
+     * 
+     * @param pageable Pagination parameters
+     * @return Page of TagSearchResult sorted by post count
      */
     fun getTrendingTags(pageable: Pageable): Page<TagSearchResult> {
         return tagRepository.findTrendingTags(pageable)

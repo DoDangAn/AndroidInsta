@@ -53,12 +53,26 @@ interface CommentRepository : JpaRepository<Comment, Long> {
     /**
      * Lấy comments gốc của một post (không bao gồm replies) - không phân trang
      */
-    fun findByPostIdAndParentCommentIsNullOrderByCreatedAtDesc(postId: Long): List<Comment>
+    @Query("""
+        SELECT c FROM Comment c 
+        LEFT JOIN FETCH c.user 
+        LEFT JOIN FETCH c.post
+        WHERE c.post.id = :postId AND c.parentComment IS NULL
+        ORDER BY c.createdAt DESC
+    """)
+    fun findByPostIdAndParentCommentIsNullOrderByCreatedAtDesc(@Param("postId") postId: Long): List<Comment>
     
     /**
      * Lấy replies của một comment - sắp xếp theo thời gian tăng dần
      */
-    fun findByParentCommentIdOrderByCreatedAtAsc(parentCommentId: Long): List<Comment>
+    @Query("""
+        SELECT c FROM Comment c 
+        LEFT JOIN FETCH c.user 
+        LEFT JOIN FETCH c.post
+        WHERE c.parentComment.id = :parentCommentId
+        ORDER BY c.createdAt ASC
+    """)
+    fun findByParentCommentIdOrderByCreatedAtAsc(@Param("parentCommentId") parentCommentId: Long): List<Comment>
     
     /**
      * Đếm số replies của một comment

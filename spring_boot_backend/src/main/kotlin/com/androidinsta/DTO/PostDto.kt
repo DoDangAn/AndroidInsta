@@ -2,40 +2,45 @@ package com.androidinsta.dto
 
 import com.androidinsta.Model.Post
 import com.androidinsta.Model.Visibility
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDateTime
 
 /**
  * DTO for Post detail response
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class PostDto(
-    val id: Long,
-    val userId: Long,
-    val username: String,
-    val userAvatarUrl: String?,
-    val caption: String?,
-    val visibility: Visibility,
-    val mediaFiles: List<MediaFileDto>,
-    val likeCount: Long = 0,
-    val commentCount: Long = 0,
-    val isLiked: Boolean = false,
-    val createdAt: LocalDateTime?,
-    val updatedAt: LocalDateTime?
+    @JsonProperty("id") val id: Long,
+    @JsonProperty("userId") val userId: Long,
+    @JsonProperty("username") val username: String,
+    @JsonProperty("userAvatarUrl") val userAvatarUrl: String?,
+    @JsonProperty("caption") val caption: String?,
+    @JsonProperty("visibility") val visibility: Visibility,
+    @JsonProperty("mediaFiles") val mediaFiles: List<MediaFileDto>,
+    @JsonProperty("likeCount") val likeCount: Long = 0,
+    @JsonProperty("commentCount") val commentCount: Long = 0,
+    @JsonProperty("isLiked") val isLiked: Boolean = false,
+    @JsonProperty("createdAt") val createdAt: LocalDateTime?,
+    @JsonProperty("updatedAt") val updatedAt: LocalDateTime?
 )
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class CreatePostRequest(
-    val caption: String,
-    val visibility: String = "PUBLIC",
-    val mediaUrls: List<String> = emptyList()
+    @JsonProperty("caption") val caption: String,
+    @JsonProperty("visibility") val visibility: String = "PUBLIC",
+    @JsonProperty("mediaUrls") val mediaUrls: List<String> = emptyList()
 )
 
 /**
  * Feed response with pagination
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class FeedResponse(
-    val posts: List<PostDto>,
-    val currentPage: Int,
-    val totalPages: Int,
-    val totalItems: Long
+    @JsonProperty("posts") val posts: List<PostDto>,
+    @JsonProperty("currentPage") val currentPage: Int,
+    @JsonProperty("totalPages") val totalPages: Int,
+    @JsonProperty("totalItems") val totalItems: Long
 )
 
 /**
@@ -68,10 +73,11 @@ fun Post.toDto(currentUserId: Long? = null): PostDto {
     )
 }
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class MediaFileDto(
-    val fileUrl: String,
-    val fileType: String,
-    val orderIndex: Int,
-    val duration: Int? = null,
-    val thumbnailUrl: String? = null
+    @JsonProperty("fileUrl") val fileUrl: String,
+    @JsonProperty("fileType") val fileType: String,
+    @JsonProperty("orderIndex") val orderIndex: Int,
+    @JsonProperty("duration") val duration: Int? = null,
+    @JsonProperty("thumbnailUrl") val thumbnailUrl: String? = null
 )

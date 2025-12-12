@@ -3,7 +3,7 @@ class NotificationModel {
   final int senderId;
   final String senderUsername;
   final String? senderAvatarUrl;
-  final String type; // LIKE, COMMENT, FOLLOW
+  final String type; // LIKE, COMMENT, FOLLOW, MESSAGE, NEW_POST
   final String? message;
   final int? entityId;
   final bool isRead;

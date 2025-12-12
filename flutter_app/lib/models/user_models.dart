@@ -57,19 +57,34 @@ class UserProfile {
 class UserStats {
   final int followersCount;
   final int followingCount;
-  final bool isFollowing;
+  final int postsCount;
 
   UserStats({
     required this.followersCount,
     required this.followingCount,
-    required this.isFollowing,
+    this.postsCount = 0,
   });
 
   factory UserStats.fromJson(Map<String, dynamic> json) {
+    // Xử lý các trường hợp: int, Long, List<dynamic> từ Redis type metadata
+    int parseCount(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      // Trường hợp Redis trả về ["java.lang.Long", 1]
+      if (value is List && value.length == 2) {
+        final actualValue = value[1];
+        if (actualValue is int) return actualValue;
+        if (actualValue is double) return actualValue.toInt();
+      }
+      return 0;
+    }
+
     return UserStats(
-      followersCount: json['followersCount'] ?? 0,
-      followingCount: json['followingCount'] ?? 0,
-      isFollowing: json['isFollowing'] ?? false,
+      followersCount: parseCount(json['followersCount']),
+      followingCount: parseCount(json['followingCount']),
+      postsCount: parseCount(json['postsCount']),
     );
   }
 }

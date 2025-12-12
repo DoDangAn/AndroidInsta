@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/user_models.dart';
+import '../models/error_models.dart';
 
 class UserService {
   static const String baseUrl = ApiConfig.usersUrl;
@@ -27,10 +28,9 @@ class UserService {
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return UserProfile.fromJson(data['data']);
+      return UserProfile.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to load profile');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -47,10 +47,9 @@ class UserService {
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return UserProfile.fromJson(data['data']);
+      return UserProfile.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to load user');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -68,11 +67,9 @@ class UserService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return (data['data'] as List)
-          .map((u) => UserProfile.fromJson(u))
-          .toList();
+      return (data as List).map((u) => UserProfile.fromJson(u)).toList();
     } else {
-      throw Exception('Failed to search users');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -80,9 +77,6 @@ class UserService {
   static Future<bool> followUser(int userId) async {
     final token = await _getToken();
     if (token == null) throw Exception('Not authenticated');
-
-    print('FollowUser API call for userId: $userId');
-    print('Using baseUrl: $baseUrl');
     
     final response = await http.post(
       Uri.parse('$baseUrl/$userId/follow'),
@@ -92,17 +86,11 @@ class UserService {
       },
     );
 
-    print('Follow response status: ${response.statusCode}');
-    print('Follow response body: ${response.body}');
-
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final success = data['success'] ?? false;
-      print('Follow success: $success');
-      return success;
+      return data['isFollowing'] ?? true;
     } else {
-      print('Follow failed with status: ${response.statusCode}');
-      throw Exception('Failed to follow user: ${response.body}');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -110,9 +98,6 @@ class UserService {
   static Future<bool> unfollowUser(int userId) async {
     final token = await _getToken();
     if (token == null) throw Exception('Not authenticated');
-
-    print('UnfollowUser API call for userId: $userId');
-    print('Using baseUrl: $baseUrl');
     
     final response = await http.delete(
       Uri.parse('$baseUrl/$userId/follow'),
@@ -122,23 +107,11 @@ class UserService {
       },
     );
 
-    print('Unfollow response status: ${response.statusCode}');
-    print('Unfollow response body: ${response.body}');
-
     if (response.statusCode == 200) {
-      try {
-        final data = jsonDecode(response.body);
-        final success = data['success'] ?? false;
-        print('Unfollow success: $success');
-        return success;
-      } catch (e) {
-        print('Error parsing unfollow response: $e');
-        // If status is 200 but parsing fails, it might still be successful if body is empty or string
-        return true; 
-      }
+      final data = jsonDecode(response.body);
+      return data['isFollowing'] ?? false;
     } else {
-      print('Unfollow failed with status: ${response.statusCode}');
-      throw Exception('Failed to unfollow user: ${response.body}');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -146,7 +119,6 @@ class UserService {
   static Future<UserStats> getUserStats(int userId) async {
     final token = await _getToken();
 
-    print('Getting stats for userId: $userId');
     final response = await http.get(
       Uri.parse('$baseUrl/$userId/stats'),
       headers: {
@@ -155,19 +127,10 @@ class UserService {
       },
     );
 
-    print('Stats response status: ${response.statusCode}');
-    print('Stats response body: ${response.body}');
-
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      // Handle both nested 'stats' and flat structure
-      if (data['stats'] != null) {
-        return UserStats.fromJson(data['stats']);
-      } else {
-        return UserStats.fromJson(data);
-      }
+      return UserStats.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to load user stats');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -185,11 +148,9 @@ class UserService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return (data['data'] as List)
-          .map((u) => UserProfile.fromJson(u))
-          .toList();
+      return (data as List).map((u) => UserProfile.fromJson(u)).toList();
     } else {
-      throw Exception('Failed to load followers');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -207,11 +168,32 @@ class UserService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return (data['data'] as List)
-          .map((u) => UserProfile.fromJson(u))
-          .toList();
+      return (data as List).map((u) => UserProfile.fromJson(u)).toList();
     } else {
-      throw Exception('Failed to load following');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
+    }
+  }
+
+  /// Get follow status (isFollowing, isFollower)
+  static Future<Map<String, bool>> getFollowStatus(int userId) async {
+    final token = await _getToken();
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/$userId/follow-status'),
+      headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return {
+        'isFollowing': data['isFollowing'] ?? false,
+        'isFollower': data['isFollower'] ?? false,
+      };
+    } else {
+      return {'isFollowing': false, 'isFollower': false};
     }
   }
 
@@ -241,11 +223,9 @@ class UserService {
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return UserProfile.fromJson(data['data']);
+      return UserProfile.fromJson(jsonDecode(response.body));
     } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['message'] ?? 'Failed to update profile');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -266,7 +246,7 @@ class UserService {
       final data = jsonDecode(response.body);
       return data['avatarUrl'];
     } else {
-      throw Exception('Failed to upload avatar');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 }

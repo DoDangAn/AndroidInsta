@@ -63,16 +63,3 @@ data class JwtResponse(
     val expiresIn: Long,
     val user: UserInfo
 )
-
-// Token Refresh Response DTO
-data class TokenRefreshResponse(
-    val accessToken: String,
-    val expiresIn: Long
-)
-
-// Generic Authentication Response
-data class AuthResponse(
-    val success: Boolean,
-    val message: String,
-    val data: JwtResponse? = null
-)

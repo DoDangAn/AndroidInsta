@@ -9,7 +9,6 @@ import java.time.LocalDateTime
 data class Role(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(columnDefinition = "SMALLINT UNSIGNED")
     val id: Short = 0,
 
     @Column(nullable = false, unique = true, length = 50)

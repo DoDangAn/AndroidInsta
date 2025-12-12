@@ -5,12 +5,19 @@ import com.androidinsta.Service.MessageService
 import com.androidinsta.Repository.User.UserRepository
 import com.androidinsta.config.SecurityUtil
 import com.androidinsta.dto.*
+import jakarta.validation.Valid
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
+/**
+ * REST controller cho chat operations
+ * Handles conversations, chat history, and message sending via REST API
+ */
 @RestController
 @RequestMapping("/api/chat")
 class ChatController(
@@ -19,16 +26,13 @@ class ChatController(
 ) {
     
     /**
-     * GET /api/chat/conversations - Lấy danh sách conversations
+     * Lấy danh sách conversations
+     * GET /api/chat/conversations
      */
     @GetMapping("/conversations")
-    @org.springframework.cache.annotation.Cacheable(
-        value = ["conversations"],
-        key = "#userId"
-    )
     fun getConversations(): ResponseEntity<ConversationsResponse> {
         val userId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            ?: throw IllegalStateException("User not authenticated")
         
         val conversations = messageService.getConversations(userId).mapNotNull { (partnerId, lastMessage) ->
             val partner = userRepository.findById(partnerId).orElse(null) ?: return@mapNotNull null
@@ -40,15 +44,22 @@ class ChatController(
                 fullName = partner.fullName,
                 lastMessage = lastMessage?.content,
                 lastMessageTime = lastMessage?.createdAt,
-                unreadCount = messageService.countUnreadMessages(userId, partnerId)
+                unreadCount = messageService.countUnreadMessages(userId, partnerId).toInt()
             )
         }
         
-        return ResponseEntity.ok(ConversationsResponse(conversations))
+        return ResponseEntity.ok(
+            ConversationsResponse(
+                success = true,
+                message = "Conversations retrieved successfully",
+                data = conversations
+            )
+        )
     }
     
     /**
-     * GET /api/chat/{userId} - Lấy chat history với một user
+     * Lấy chat history với một user
+     * GET /api/chat/{userId}
      */
     @GetMapping("/{userId}")
     fun getChatHistory(
@@ -57,17 +68,16 @@ class ChatController(
         @RequestParam(defaultValue = "50") size: Int
     ): ResponseEntity<ChatHistoryResponse> {
         val currentUserId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            ?: throw IllegalStateException("User not authenticated")
         
         val pageable = PageRequest.of(page, size, Sort.by("createdAt").descending())
         val messages = messageService.getChatHistory(currentUserId, userId, pageable)
         
-        // Đánh dấu messages là đã đọc
         messageService.markAsRead(currentUserId, userId)
         
         return ResponseEntity.ok(
             ChatHistoryResponse(
-                messages = messages.content.map { it.toDto() }.reversed(), // Reverse để mới nhất ở cuối
+                messages = messages.content.map { it.toDto() }.reversed(),
                 currentPage = messages.number,
                 totalPages = messages.totalPages,
                 totalMessages = messages.totalElements
@@ -76,16 +86,14 @@ class ChatController(
     }
     
     /**
-     * POST /api/chat/send - Gửi message
+     * Gửi message
+     * POST /api/chat/send
      */
     @PostMapping("/send")
-    @org.springframework.cache.annotation.CacheEvict(
-        value = ["conversations", "chatHistory"],
-        allEntries = true
-    )
-    fun sendMessage(@RequestBody request: SendMessageRequest): ResponseEntity<MessageDto> {
+    @CacheEvict(value = ["conversations", "chatHistory"], allEntries = true)
+    fun sendMessage(@Valid @RequestBody request: SendMessageRequest): ResponseEntity<MessageDto> {
         val senderId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            ?: throw IllegalStateException("User not authenticated")
         
         val messageType = try {
             MessageType.valueOf(request.messageType.lowercase())
@@ -105,24 +113,26 @@ class ChatController(
     }
     
     /**
-     * DELETE /api/chat/{messageId} - Xóa message
+     * Xóa message
+     * DELETE /api/chat/{messageId}
      */
     @DeleteMapping("/{messageId}")
     fun deleteMessage(@PathVariable messageId: Long): ResponseEntity<Unit> {
         val userId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            ?: throw IllegalStateException("User not authenticated")
         
         messageService.deleteMessage(messageId, userId)
         return ResponseEntity.noContent().build()
     }
     
     /**
-     * PUT /api/chat/read/{userId} - Đánh dấu tất cả messages từ userId là đã đọc
+     * Đánh dấu tất cả messages từ userId là đã đọc
+     * PUT /api/chat/read/{userId}
      */
     @PutMapping("/read/{userId}")
     fun markAsRead(@PathVariable userId: Long): ResponseEntity<Unit> {
         val currentUserId = SecurityUtil.getCurrentUserId()
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            ?: throw IllegalStateException("User not authenticated")
         
         messageService.markAsRead(currentUserId, userId)
         return ResponseEntity.ok().build()

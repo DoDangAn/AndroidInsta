@@ -38,7 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final response = await LoginService.register(
+      final authData = await LoginService.register(
         _usernameController.text.trim(),
         _emailController.text.trim(),
         _passwordController.text,
@@ -47,17 +47,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
             : _fullNameController.text.trim(),
       );
 
-      if (response.success && response.data != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', response.data!.accessToken);
-        await prefs.setString('refresh_token', response.data!.refreshToken);
-        await prefs.setInt('user_id', response.data!.user.id);
-        await prefs.setString('username', response.data!.user.username);
-        await prefs.setString('email', response.data!.user.email);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('access_token', authData.accessToken);
+      await prefs.setString('refresh_token', authData.refreshToken);
+      await prefs.setInt('user_id', authData.user.id);
+      await prefs.setString('username', authData.user.username);
+      await prefs.setString('email', authData.user.email);
 
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/home');
-        }
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
       setState(() {

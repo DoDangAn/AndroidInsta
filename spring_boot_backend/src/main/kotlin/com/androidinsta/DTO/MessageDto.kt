@@ -2,26 +2,34 @@ package com.androidinsta.dto
 
 import com.androidinsta.Model.Message
 import com.androidinsta.Model.MessageType
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDateTime
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class MessageDto(
-    val id: Long,
-    val senderId: Long,
-    val senderUsername: String,
-    val senderAvatarUrl: String?,
-    val receiverId: Long,
-    val receiverUsername: String,
-    val receiverAvatarUrl: String?,
-    val content: String?,
-    val mediaUrl: String?,
-    val messageType: MessageType,
-    val isRead: Boolean,
-    val createdAt: LocalDateTime
+    @JsonProperty("id") val id: Long,
+    @JsonProperty("senderId") val senderId: Long,
+    @JsonProperty("senderUsername") val senderUsername: String,
+    @JsonProperty("senderAvatarUrl") val senderAvatarUrl: String?,
+    @JsonProperty("receiverId") val receiverId: Long,
+    @JsonProperty("receiverUsername") val receiverUsername: String,
+    @JsonProperty("receiverAvatarUrl") val receiverAvatarUrl: String?,
+    @JsonProperty("content") val content: String?,
+    @JsonProperty("mediaUrl") val mediaUrl: String?,
+    @JsonProperty("messageType") val messageType: MessageType,
+    @JsonProperty("isRead") val isRead: Boolean,
+    @JsonProperty("createdAt") val createdAt: LocalDateTime
 )
 
 data class SendMessageRequest(
+    @field:jakarta.validation.constraints.NotNull(message = "Receiver ID is required")
+    @field:jakarta.validation.constraints.Positive(message = "Receiver ID must be positive")
     val receiverId: Long,
+    
+    @field:jakarta.validation.constraints.Size(max = 5000, message = "Content must not exceed 5000 characters")
     val content: String?,
+    
     val mediaUrl: String? = null,
     val messageType: String = "text"
 )

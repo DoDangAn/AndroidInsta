@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/reel_service.dart';
 
 class ReelScreen extends StatefulWidget {
-  const ReelScreen({Key? key}) : super(key: key);
+  const ReelScreen({super.key});
 
   @override
   State<ReelScreen> createState() => _ReelScreenState();
@@ -10,7 +10,7 @@ class ReelScreen extends StatefulWidget {
 
 class _ReelScreenState extends State<ReelScreen> {
   final PageController _pageController = PageController();
-  List<Map<String, dynamic>> _reels = [];
+  final List<Map<String, dynamic>> _reels = [];
   bool _isLoading = true;
   int _currentPage = 0;
 

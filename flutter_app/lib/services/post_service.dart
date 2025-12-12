@@ -5,6 +5,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/post_models.dart';
+import '../models/error_models.dart';
 
 class PostService {
   static const String baseUrl = ApiConfig.postsUrl;
@@ -17,35 +18,21 @@ class PostService {
 
   /// Get feed posts
   static Future<FeedResponse> getFeed({int page = 0, int size = 20}) async {
-    try {
-      final token = await _getToken();
-      if (token == null) throw Exception('Not authenticated');
+    final token = await _getToken();
+    if (token == null) throw Exception('Not authenticated');
 
-      print('=== FETCHING FEED ===');
-      print('URL: $baseUrl/feed?page=$page&size=$size');
-      
-      final response = await http.get(
-        Uri.parse('$baseUrl/feed?page=$page&size=$size'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
+    final response = await http.get(
+      Uri.parse('$baseUrl/feed?page=$page&size=$size'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
 
-      print('Feed response status: ${response.statusCode}');
-      print('Feed response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final feedResponse = FeedResponse.fromJson(jsonDecode(response.body));
-        print('Feed parsed successfully: ${feedResponse.posts.length} posts');
-        return feedResponse;
-      } else {
-        print('Feed failed with status: ${response.statusCode}');
-        throw Exception('Failed to load feed: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Feed error: $e');
-      rethrow;
+    if (response.statusCode == 200) {
+      return FeedResponse.fromJson(jsonDecode(response.body));
+    } else {
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -64,11 +51,12 @@ class PostService {
     if (response.statusCode == 200) {
       return FeedResponse.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to load user posts');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
-  /// Get advertise/public posts
+  /// Get recent PUBLIC posts (last 7 days)
+  /// Used for Explore/Discover feature
   static Future<FeedResponse> getAdvertisePosts({int page = 0, int size = 20}) async {
     final token = await _getToken();
     
@@ -83,7 +71,7 @@ class PostService {
     if (response.statusCode == 200) {
       return FeedResponse.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to load advertise posts');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -102,7 +90,7 @@ class PostService {
     if (response.statusCode == 200) {
       return PostDto.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to load post');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -131,7 +119,7 @@ class PostService {
     if (response.statusCode == 201) {
       return PostDto.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to create post');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -149,7 +137,7 @@ class PostService {
     );
 
     if (response.statusCode != 204) {
-      throw Exception('Failed to delete post');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -173,7 +161,7 @@ class PostService {
     if (response.statusCode == 200) {
       return PostDto.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to update post');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -192,9 +180,9 @@ class PostService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['success'] ?? false;
+      return data['isLiked'] ?? true;
     } else {
-      throw Exception('Failed to like post');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -213,35 +201,35 @@ class PostService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['success'] ?? false;
+      return data['isLiked'] ?? false;
     } else {
-      throw Exception('Failed to unlike post');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
-  /// Add comment to post
-  static Future<Comment> addComment(int postId, String content) async {
+  /// Add comment to post (or reply to comment)
+  static Future<Comment> addComment(int postId, String content, {int? parentCommentId}) async {
     final token = await _getToken();
     if (token == null) throw Exception('Not authenticated');
 
-    print('Adding comment to post $postId: $content');
+    final requestBody = {
+      'content': content,
+      if (parentCommentId != null) 'parentCommentId': parentCommentId,
+    };
+
     final response = await http.post(
       Uri.parse('$baseUrl/$postId/comments'),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({'content': content}),
+      body: jsonEncode(requestBody),
     );
 
-    print('Add comment response: ${response.statusCode}');
-    print('Add comment body: ${response.body}');
-
     if (response.statusCode == 201) {
-      final data = jsonDecode(response.body);
-      return Comment.fromJson(data); // Backend trả về comment trực tiếp, không có wrapper
+      return Comment.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to add comment: ${response.statusCode}');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -249,7 +237,6 @@ class PostService {
   static Future<List<Comment>> getComments(int postId) async {
     final token = await _getToken();
 
-    print('Getting comments for post $postId');
     final response = await http.get(
       Uri.parse('$baseUrl/$postId/comments'),
       headers: {
@@ -258,22 +245,15 @@ class PostService {
       },
     );
 
-    print('Get comments response: ${response.statusCode}');
-    print('Get comments body: ${response.body}');
-
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      // Backend trả về array trực tiếp
       if (data is List) {
         return data.map((c) => Comment.fromJson(c)).toList();
       } else {
-        // Fallback nếu có wrapper
-        return (data['comments'] as List)
-            .map((c) => Comment.fromJson(c))
-            .toList();
+        throw Exception('Invalid response format');
       }
     } else {
-      throw Exception('Failed to load comments');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -282,7 +262,6 @@ class PostService {
     final token = await _getToken();
     if (token == null) throw Exception('Not authenticated');
 
-    print('Deleting comment $commentId from post $postId');
     final response = await http.delete(
       Uri.parse('$baseUrl/$postId/comments/$commentId'),
       headers: {
@@ -291,11 +270,8 @@ class PostService {
       },
     );
 
-    print('Delete comment response: ${response.statusCode}');
-    print('Delete comment body: ${response.body}');
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to delete comment: ${response.statusCode}');
+    if (response.statusCode != 204) {
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -374,15 +350,9 @@ class PostService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        try {
-          final errorBody = jsonDecode(response.body);
-          throw Exception(errorBody['message'] ?? 'Failed to upload post');
-        } catch (e) {
-          throw Exception('Failed to upload post: ${response.body}');
-        }
+        throw ApiErrorParser.parseError(response.statusCode, response.body);
       }
     } catch (e) {
-      print('Upload error: $e');
       rethrow;
     }
   }

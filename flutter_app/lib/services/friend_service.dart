@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/friend_models.dart';
+import '../models/error_models.dart';
 
 class FriendService {
   final String baseUrl = ApiConfig.baseUrl;
@@ -26,8 +27,7 @@ class FriendService {
     if (response.statusCode == 201 || response.statusCode == 200) {
       return FriendRequest.fromJson(json.decode(response.body));
     } else {
-      final error = json.decode(response.body);
-      throw Exception(error['message'] ?? 'Failed to send friend request');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -52,7 +52,7 @@ class FriendService {
           .map((r) => FriendRequest.fromJson(r))
           .toList();
     } else {
-      throw Exception('Failed to load friend requests');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 
@@ -77,7 +77,7 @@ class FriendService {
           .map((r) => FriendRequest.fromJson(r))
           .toList();
     } else {
-      throw Exception('Failed to load sent requests');
+      throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
 

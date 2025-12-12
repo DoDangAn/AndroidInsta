@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.flutter_app">
 
+    <uses-sdk android:minSdkVersion="23" />
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application

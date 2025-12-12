@@ -22,8 +22,11 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ChatMessage> _messages = [];
   bool _isLoading = true;
   String? _error;
-  String? _currentUsername;
+  int? _currentUserId;
   StompClient? _stompClient;
+  bool _isTyping = false;
+  bool _isOtherUserTyping = false;
+  bool _isConnected = false;
 
   @override
   void initState() {
@@ -31,12 +34,37 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadCurrentUser();
     _loadMessages();
     _connectWebSocket();
+    _messageController.addListener(_onTyping);
+  }
+
+  void _onTyping() {
+    if (_messageController.text.isNotEmpty && !_isTyping) {
+      _sendTypingIndicator(true);
+    } else if (_messageController.text.isEmpty && _isTyping) {
+      _sendTypingIndicator(false);
+    }
+  }
+
+  void _sendTypingIndicator(bool isTyping) {
+    setState(() {
+      _isTyping = isTyping;
+    });
+
+    if (_stompClient != null && _stompClient!.connected) {
+      _stompClient!.send(
+        destination: '/app/typing',
+        body: json.encode({
+          'receiverId': widget.user.id,
+          'isTyping': isTyping,
+        }),
+      );
+    }
   }
 
   Future<void> _loadCurrentUser() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _currentUsername = prefs.getString('username');
+      _currentUserId = prefs.getInt('user_id');
     });
   }
 
@@ -80,14 +108,20 @@ class _ChatScreenState extends State<ChatScreen> {
     if (token == null) return;
 
     // Use 10.0.2.2 for Android emulator, localhost for iOS simulator
-    // Adjust port if needed (8081 based on your backend)
     const wsUrl = 'ws://10.0.2.2:8081/ws/websocket';
 
     _stompClient = StompClient(
       config: StompConfig(
         url: wsUrl,
         onConnect: (frame) {
-          print('Connected to WebSocket');
+          print('✅ Connected to WebSocket');
+          if (mounted) {
+            setState(() {
+              _isConnected = true;
+            });
+          }
+          
+          // Subscribe to personal message queue
           _stompClient?.subscribe(
             destination: '/user/queue/messages',
             callback: (frame) {
@@ -117,10 +151,51 @@ class _ChatScreenState extends State<ChatScreen> {
               }
             },
           );
+          
+          // Subscribe to typing indicators
+          _stompClient?.subscribe(
+            destination: '/user/queue/typing',
+            callback: (frame) {
+              if (frame.body != null && mounted) {
+                try {
+                  final data = json.decode(frame.body!);
+                  final senderId = data['senderId'];
+                  final isTyping = data['isTyping'] ?? false;
+                  
+                  // Only show typing if it's from the current chat partner
+                  if (senderId == widget.user.id) {
+                    setState(() {
+                      _isOtherUserTyping = isTyping;
+                    });
+                    print('${widget.user.username} is ${isTyping ? "typing" : "not typing"}');
+                  }
+                } catch (e) {
+                  print('Error parsing typing indicator: $e');
+                }
+              }
+            },
+          );
         },
-        onWebSocketError: (dynamic error) => print('WebSocket Error: $error'),
+        onDisconnect: (frame) {
+          print('❌ Disconnected from WebSocket');
+          if (mounted) {
+            setState(() {
+              _isConnected = false;
+            });
+          }
+        },
+        onWebSocketError: (dynamic error) {
+          print('⚠️ WebSocket Error: $error');
+          if (mounted) {
+            setState(() {
+              _isConnected = false;
+            });
+          }
+        },
         stompConnectHeaders: {'Authorization': 'Bearer $token'},
         webSocketConnectHeaders: {'Authorization': 'Bearer $token'},
+        // Auto-reconnect on disconnect
+        reconnectDelay: const Duration(seconds: 5),
       ),
     );
 
@@ -153,17 +228,30 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
 
     try {
-      // Send via REST API (WebSocket implementation can be added later)
-      final message = await _chatService.sendMessage(widget.user.id, content);
-      setState(() {
-        _messages.add(message);
-      });
-
-      // Scroll to bottom
-      _scrollToBottom();
+      if (_stompClient != null && _stompClient!.connected) {
+        // Send via WebSocket STOMP
+        _stompClient!.send(
+          destination: '/app/chat',
+          body: json.encode({
+            'receiverId': widget.user.id,
+            'content': content,
+            'messageType': 'TEXT',
+          }),
+        );
+        
+        // Optimistically add message to UI
+        // The real message will come back via WebSocket subscription
+      } else {
+        // Fallback to REST API if WebSocket is disconnected
+        print('WebSocket not connected, using REST API fallback');
+        final message = await _chatService.sendMessage(widget.user.id, content);
+        setState(() {
+          _messages.add(message);
+        });
+        _scrollToBottom();
+      }
     } catch (e) {
       if (mounted) {
-        // Extract error message
         String errorMessage = 'Không thể gửi tin nhắn';
         if (e.toString().contains('Exception:')) {
           errorMessage = e.toString().replaceFirst('Exception: ', '');
@@ -213,21 +301,83 @@ class _ChatScreenState extends State<ChatScreen> {
                   : null,
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.user.fullName ?? widget.user.username,
-                  style: const TextStyle(fontSize: 16),
-                ),
-                Text(
-                  '@${widget.user.username}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.user.fullName ?? widget.user.username,
+                    style: const TextStyle(fontSize: 16),
                   ),
-                ),
-              ],
+                  Row(
+                    children: [
+                      Text(
+                        '@${widget.user.username}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      if (_isOtherUserTyping) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[100],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 10,
+                                height: 10,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.5,
+                                  color: Colors.blue[700],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'typing...',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.blue[700],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else if (!_isConnected) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[100],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.cloud_off, size: 10, color: Colors.orange[700]),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Offline',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.orange[700],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -298,7 +448,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(ChatMessage message) {
-    final isMe = message.sender.username == _currentUsername;
+    final isMe = message.sender.id == _currentUserId;
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,

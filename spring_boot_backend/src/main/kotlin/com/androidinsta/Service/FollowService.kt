@@ -84,8 +84,15 @@ class FollowService(
 
     fun getFollowingCount(userId: Long): Long {
         val cacheKey = "following:count:$userId"
-        val cached = redisService.get(cacheKey, Long::class.java)
-        if (cached != null) return cached
+        val cached = redisService.get(cacheKey)
+        if (cached != null) {
+            return when (cached) {
+                is Long -> cached
+                is Int -> cached.toLong()
+                is Number -> cached.toLong()
+                else -> 0L
+            }
+        }
         
         val count = followRepository.countByFollowerId(userId)
         redisService.set(cacheKey, count, java.time.Duration.ofMinutes(30))
@@ -94,8 +101,15 @@ class FollowService(
 
     fun getFollowersCount(userId: Long): Long {
         val cacheKey = "followers:count:$userId"
-        val cached = redisService.get(cacheKey, Long::class.java)
-        if (cached != null) return cached
+        val cached = redisService.get(cacheKey)
+        if (cached != null) {
+            return when (cached) {
+                is Long -> cached
+                is Int -> cached.toLong()
+                is Number -> cached.toLong()
+                else -> 0L
+            }
+        }
         
         val count = followRepository.countByFollowedId(userId)
         redisService.set(cacheKey, count, java.time.Duration.ofMinutes(30))
@@ -108,5 +122,25 @@ class FollowService(
 
     fun getFollowing(userId: Long): List<com.androidinsta.Model.User> {
         return followRepository.findByFollowerId(userId).map { it.followed }
+    }
+
+    /**
+     * Get user stats với cache ở Service layer (DTO thuần, không cache ResponseEntity)
+     */
+    /**
+     * Get user stats (follower count, following count, posts count)
+     * DON'T cache complex DTOs - individual counters are already cached
+     */
+    fun getUserStats(userId: Long): com.androidinsta.dto.UserStatsDto {
+        val followersCount = getFollowersCount(userId)
+        val followingCount = getFollowingCount(userId)
+        // TODO: implement posts count from PostRepository
+        val postsCount = 0L
+
+        return com.androidinsta.dto.UserStatsDto(
+            followersCount = followersCount,
+            followingCount = followingCount,
+            postsCount = postsCount
+        )
     }
 }

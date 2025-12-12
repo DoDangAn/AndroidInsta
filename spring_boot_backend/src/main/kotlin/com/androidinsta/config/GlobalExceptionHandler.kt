@@ -1,5 +1,7 @@
 package com.androidinsta.config
 
+import com.androidinsta.dto.ErrorResponse
+import com.androidinsta.dto.ValidationErrorResponse
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -10,16 +12,6 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
-import java.time.LocalDateTime
-
-data class ErrorResponse(
-    val timestamp: LocalDateTime = LocalDateTime.now(),
-    val status: Int,
-    val error: String,
-    val message: String,
-    val path: String? = null,
-    val details: Map<String, Any>? = null
-)
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -69,7 +61,7 @@ class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
-    fun handleValidationExceptions(ex: MethodArgumentNotValidException, request: WebRequest): ResponseEntity<ErrorResponse> {
+    fun handleValidationExceptions(ex: MethodArgumentNotValidException, request: WebRequest): ResponseEntity<ValidationErrorResponse> {
         val errors = mutableMapOf<String, String>()
         ex.bindingResult.allErrors.forEach { error ->
             val fieldName = (error as FieldError).field
@@ -79,12 +71,9 @@ class GlobalExceptionHandler {
         
         logger.warn("Validation failed: $errors")
         
-        val error = ErrorResponse(
-            status = HttpStatus.BAD_REQUEST.value(),
-            error = "Validation Failed",
-            message = "Input validation failed",
-            path = request.getDescription(false).removePrefix("uri="),
-            details = mapOf("validationErrors" to errors)
+        val error = ValidationErrorResponse(
+            message = "Input validation failed. Please check the following fields:",
+            fieldErrors = errors
         )
         
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error)

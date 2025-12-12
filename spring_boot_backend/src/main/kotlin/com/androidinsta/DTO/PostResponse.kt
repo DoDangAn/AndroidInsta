@@ -1,33 +1,38 @@
 package com.androidinsta.dto
 
 import com.androidinsta.Model.Visibility
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDateTime
 import com.androidinsta.Model.Post
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class PostUserResponse(
-    val id: Long,
-    val username: String
+    @JsonProperty("id") val id: Long,
+    @JsonProperty("username") val username: String
 )
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class PostMediaFile(
-    val fileUrl: String,
-    val fileType: String,
-    val orderIndex: Int,
-    val duration: Int? = null,
-    val thumbnailUrl: String? = null
+    @JsonProperty("fileUrl") val fileUrl: String,
+    @JsonProperty("fileType") val fileType: String,
+    @JsonProperty("orderIndex") val orderIndex: Int,
+    @JsonProperty("duration") val duration: Int? = null,
+    @JsonProperty("thumbnailUrl") val thumbnailUrl: String? = null
 )
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class PostResponse(
-    val id: Long,
-    val user: PostUserResponse,
-    val caption: String?,
-    val visibility: Visibility,
-    val mediaFiles: List<PostMediaFile> = emptyList(),
-    val likeCount: Long = 0,
-    val commentCount: Long = 0,
-    val isLiked: Boolean = false,
-    val createdAt: LocalDateTime?,
-    val updatedAt: LocalDateTime?
+    @JsonProperty("id") val id: Long,
+    @JsonProperty("user") val user: PostUserResponse,
+    @JsonProperty("caption") val caption: String?,
+    @JsonProperty("visibility") val visibility: Visibility,
+    @JsonProperty("mediaFiles") val mediaFiles: List<PostMediaFile> = emptyList(),
+    @JsonProperty("likeCount") val likeCount: Long = 0,
+    @JsonProperty("commentCount") val commentCount: Long = 0,
+    @JsonProperty("isLiked") val isLiked: Boolean = false,
+    @JsonProperty("createdAt") val createdAt: LocalDateTime?,
+    @JsonProperty("updatedAt") val updatedAt: LocalDateTime?
 )
 
 // Extension function chuyển từ Post -> PostResponse

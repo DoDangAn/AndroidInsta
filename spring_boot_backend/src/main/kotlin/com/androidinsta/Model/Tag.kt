@@ -8,7 +8,6 @@ import java.time.LocalDateTime
 data class Tag(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(columnDefinition = "BIGINT UNSIGNED")
     val id: Long = 0,
 
     @Column(nullable = false, unique = true, length = 50)

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/chat_service.dart';
+import '../services/user_service.dart';
 import '../models/chat_models.dart';
+import '../models/user_models.dart';
 import 'chat_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -53,9 +56,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_square),
-            onPressed: () {
-              // TODO: Navigate to new message screen
-            },
+            onPressed: _showNewMessageDialog,
           ),
         ],
       ),
@@ -217,5 +218,260 @@ class _ChatListScreenState extends State<ChatListScreen> {
     } catch (e) {
       return '';
     }
+  }
+
+  Future<void> _showNewMessageDialog() async {
+    // Get current user ID
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('user_id') ?? 0;
+
+    // Load both following and followers (1 trong 2 follow là được chat)
+    List<UserProfile> chatableUsers = [];
+    try {
+      final following = await UserService.getFollowing(userId);
+      final followers = await UserService.getFollowers(userId);
+      
+      // Combine và remove duplicates
+      final userMap = <int, UserProfile>{};
+      for (var user in following) {
+        userMap[user.id] = user;
+      }
+      for (var user in followers) {
+        userMap[user.id] = user;
+      }
+      chatableUsers = userMap.values.toList();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading users: $e')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    if (chatableUsers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No one to chat with. Follow someone or get followed first!')),
+      );
+      return;
+    }
+
+    // Show dialog with chatable users
+    showDialog(
+      context: context,
+      builder: (context) => _NewMessageDialog(following: chatableUsers),
+    );
+  }
+
+  bool _isUserOnline(int userId) {
+    // TODO: Implement real online status from WebSocket
+    // For now, show users with even IDs as online
+    return userId % 2 == 0;
+  }
+}
+
+class _NewMessageDialog extends StatefulWidget {
+  final List<UserProfile> following;
+
+  const _NewMessageDialog({required this.following});
+
+  @override
+  State<_NewMessageDialog> createState() => _NewMessageDialogState();
+}
+
+class _NewMessageDialogState extends State<_NewMessageDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  List<UserProfile> _filteredFollowing = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredFollowing = widget.following;
+    _searchController.addListener(_filterFollowing);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterFollowing() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredFollowing = widget.following;
+      } else {
+        _filteredFollowing = widget.following.where((user) {
+          return user.username.toLowerCase().contains(query) ||
+                 (user.fullName?.toLowerCase().contains(query) ?? false);
+        }).toList();
+      }
+    });
+  }
+
+  bool _isUserOnline(int userId) {
+    return userId % 2 == 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Header
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'New Message',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Search bar
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey[200],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Following list
+            Expanded(
+              child: _filteredFollowing.isEmpty
+                  ? Center(
+                      child: Text(
+                        _searchController.text.isEmpty
+                            ? 'No one to message'
+                            : 'No users found',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _filteredFollowing.length,
+                      itemBuilder: (context, index) {
+                        final user = _filteredFollowing[index];
+                        final isOnline = _isUserOnline(user.id);
+                        
+                        return ListTile(
+                          leading: Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 25,
+                                backgroundImage: user.avatarUrl != null
+                                    ? NetworkImage(user.avatarUrl!)
+                                    : null,
+                                backgroundColor: Colors.grey[300],
+                                child: user.avatarUrl == null
+                                    ? Text(
+                                        user.username[0].toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              // Online indicator
+                              if (isOnline)
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    width: 14,
+                                    height: 14,
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  user.fullName ?? user.username,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              if (isOnline)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'Online',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          subtitle: Text(
+                            user.username,
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context); // Close dialog
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(
+                                  user: UserSummary(
+                                    id: user.id,
+                                    username: user.username,
+                                    fullName: user.fullName,
+                                    avatarUrl: user.avatarUrl,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
