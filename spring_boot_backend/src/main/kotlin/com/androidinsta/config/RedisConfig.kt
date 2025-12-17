@@ -16,7 +16,12 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer
 import org.springframework.data.redis.serializer.RedisSerializationContext
 import org.springframework.data.redis.serializer.StringRedisSerializer
+import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer
+import org.springframework.data.redis.serializer.RedisSerializer
+import com.androidinsta.dto.FeedResponse
 import java.time.Duration
+import org.springframework.boot.CommandLineRunner
+import javax.annotation.PostConstruct
 
 /**
  * Redis Configuration for AndroidInsta - PROFESSIONAL APPROACH
@@ -35,7 +40,7 @@ import java.time.Duration
  * WHAT WE DON'T USE REDIS FOR:
  * ===================================================================
  * ❌ 1. Complex DTO Caching: Removed ALL @Cacheable from DTO endpoints
- * ❌ 2. Object Serialization: No GenericJackson2JsonRedisSerializer
+ * ❌ 2. Object Serialization: No GenericJackson2JsonRedisRedisSerializer
  * ❌ 3. Full Response Caching: Database with indexes is fast enough (< 50ms)
  * 
  * ===================================================================
@@ -87,10 +92,16 @@ class RedisConfig {
             .prefixCacheNameWith("androidinsta:")
 
         // Custom TTL for different cache types
+        val feedSerializer = Jackson2JsonRedisSerializer(FeedResponse::class.java)
+        feedSerializer.setObjectMapper(objectMapper())
+
         val cacheConfigurations = mapOf(
             "users" to defaultConfig.entryTtl(Duration.ofMinutes(30)),
             "posts" to defaultConfig.entryTtl(Duration.ofMinutes(15)),
-            "feed" to defaultConfig.entryTtl(Duration.ofMinutes(5)),
+            "feed" to defaultConfig.entryTtl(Duration.ofMinutes(5))
+                .serializeValuesWith(
+                    RedisSerializationContext.SerializationPair.fromSerializer(feedSerializer)
+                ),
             "notifications" to defaultConfig.entryTtl(Duration.ofMinutes(10)),
             "search" to defaultConfig.entryTtl(Duration.ofMinutes(20)),
             "stats" to defaultConfig.entryTtl(Duration.ofHours(2))
@@ -110,6 +121,99 @@ class RedisConfig {
             disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             // Clean JSON without type metadata - Flutter compatible
+        }
+    }
+
+    @Bean
+    fun testFeedResponseSerialization(): Boolean {
+        val feedSerializer = Jackson2JsonRedisSerializer(FeedResponse::class.java)
+        feedSerializer.setObjectMapper(objectMapper())
+
+        val testFeedResponse = FeedResponse(
+            posts = listOf(),
+            currentPage = 1,
+            totalPages = 1,
+            totalItems = 0
+        )
+
+        return try {
+            val serialized = feedSerializer.serialize(testFeedResponse)
+            val deserialized = feedSerializer.deserialize(serialized!!)
+            println("Serialization successful: $deserialized")
+            true
+        } catch (e: Exception) {
+            println("Serialization failed: ${e.message}")
+            false
+        }
+    }
+
+    @Bean
+    fun validateFeedCacheConfiguration(cacheManager: CacheManager): Boolean {
+        return try {
+            val feedCache = cacheManager.getCache("feed")
+            if (feedCache == null) {
+                println("Feed cache not found in CacheManager.")
+                return false
+            }
+            println("Feed cache found. Testing serialization...")
+
+            val feedSerializer = Jackson2JsonRedisSerializer(FeedResponse::class.java)
+            feedSerializer.setObjectMapper(objectMapper())
+
+            val testFeedResponse = FeedResponse(
+                posts = listOf(),
+                currentPage = 1,
+                totalPages = 1,
+                totalItems = 0
+            )
+
+            val serialized = feedSerializer.serialize(testFeedResponse)
+            val deserialized = feedSerializer.deserialize(serialized!!)
+            println("Feed cache serialization successful: $deserialized")
+            true
+        } catch (e: Exception) {
+            println("Feed cache validation failed: ${e.message}")
+            false
+        }
+    }
+
+    @Bean
+    fun validateRedisConfigurationRunner(redisTemplate: RedisTemplate<String, Any>, cacheManager: CacheManager): CommandLineRunner {
+        return CommandLineRunner {
+            val feedCacheValid = validateFeedCacheConfiguration(cacheManager)
+            println("Feed cache configuration valid: $feedCacheValid")
+
+            val serializationTest = testFeedResponseSerialization()
+            println("FeedResponse serialization test passed: $serializationTest")
+        }
+    }
+
+    @Bean
+    fun validateFeedCacheConfigurationWithLogging(cacheManager: CacheManager): CommandLineRunner {
+        return CommandLineRunner {
+            val feedCache = cacheManager.getCache("feed")
+            if (feedCache == null) {
+                println("Feed cache not found in CacheManager.")
+            } else {
+                println("Feed cache found. Testing serialization...")
+                val feedSerializer = Jackson2JsonRedisSerializer(FeedResponse::class.java)
+                feedSerializer.setObjectMapper(objectMapper())
+
+                val testFeedResponse = FeedResponse(
+                    posts = listOf(),
+                    currentPage = 1,
+                    totalPages = 1,
+                    totalItems = 0
+                )
+
+                try {
+                    val serialized = feedSerializer.serialize(testFeedResponse)
+                    val deserialized = feedSerializer.deserialize(serialized!!)
+                    println("Feed cache serialization successful: $deserialized")
+                } catch (e: Exception) {
+                    println("Feed cache serialization failed: ${e.message}")
+                }
+            }
         }
     }
 }

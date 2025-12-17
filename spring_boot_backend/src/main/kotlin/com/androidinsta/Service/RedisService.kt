@@ -351,4 +351,38 @@ class RedisService(
             -1
         }
     }
+
+    /**
+     * Increment a numeric key atomically. Returns the new value.
+     * If ttl is provided and this is a new key, set the ttl.
+     */
+    fun increment(key: String, delta: Long = 1, ttl: Duration? = null): Long {
+        return try {
+            val value = redisTemplate.opsForValue().increment(key, delta) ?: 0L
+            if (ttl != null) {
+                redisTemplate.expire(key, ttl)
+            }
+            value
+        } catch (e: Exception) {
+            logger.error("Error incrementing key: $key", e)
+            0L
+        }
+    }
+
+    /**
+     * Push a string entry to a Redis list (left push), trim to `maxLen`, and set optional TTL.
+     */
+    fun pushToList(key: String, value: String, maxLen: Int = 200, ttl: Duration? = null) {
+        try {
+            redisTemplate.opsForList().leftPush(key, value)
+            if (maxLen > 0) {
+                redisTemplate.opsForList().trim(key, 0, (maxLen - 1).toLong())
+            }
+            if (ttl != null) {
+                redisTemplate.expire(key, ttl)
+            }
+        } catch (e: Exception) {
+            logger.error("Error pushing to list $key", e)
+        }
+    }
 }

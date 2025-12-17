@@ -98,6 +98,19 @@ interface PostRepository : JpaRepository<Post, Long> {
         ORDER BY p.createdAt DESC
     """)
     fun searchPosts(@Param("keyword") keyword: String, pageable: Pageable): Page<Post>
+
+    @Query("""
+        SELECT DISTINCT p FROM Post p 
+        LEFT JOIN p.user u 
+        LEFT JOIN p.mediaFiles mf
+        WHERE p.visibility = 'PUBLIC'
+        AND mf.fileType = 'VIDEO'
+        AND (LOWER(p.caption) LIKE LOWER(CONCAT('%', :keyword, '%')) 
+             OR LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%'))
+             OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')))
+        ORDER BY p.createdAt DESC
+    """)
+    fun searchReels(@Param("keyword") keyword: String, pageable: Pageable): Page<Post>
     
     /**
      * Count posts created after a date

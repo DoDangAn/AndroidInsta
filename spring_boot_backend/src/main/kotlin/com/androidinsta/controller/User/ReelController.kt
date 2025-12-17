@@ -80,7 +80,7 @@ class ReelController(
             user = user,
             caption = caption,
             visibility = Visibility.valueOf(visibilityStr.uppercase()),
-            mediaFiles = listOf(mediaFile)
+            mediaFiles = mutableListOf(mediaFile)
         )
 
         val saved = postRepository.save(post)

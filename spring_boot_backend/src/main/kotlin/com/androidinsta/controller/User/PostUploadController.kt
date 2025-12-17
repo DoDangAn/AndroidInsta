@@ -1,10 +1,12 @@
 package com.androidinsta.controller.User
 
 import com.androidinsta.Model.*
-import com.androidinsta.Repository.User.PostRepository
+import com.androidinsta.Service.PostService
 import com.androidinsta.Repository.User.UserRepository
 import com.androidinsta.Service.CloudinaryService
 import com.androidinsta.Service.ImageQuality
+import com.androidinsta.Service.RedisService
+import org.springframework.cache.CacheManager
 import com.androidinsta.config.SecurityUtil
 import com.androidinsta.dto.*
 import org.springframework.http.HttpStatus
@@ -19,9 +21,11 @@ import org.springframework.web.multipart.MultipartFile
 @RestController
 @RequestMapping("/api/posts")
 class PostUploadController(
-    private val postRepository: PostRepository,
+    private val postService: PostService,
     private val userRepository: UserRepository,
-    private val cloudinaryService: CloudinaryService
+    private val cloudinaryService: CloudinaryService,
+    private val redisService: RedisService,
+    private val cacheManager: CacheManager
 ) {
 
     /**
@@ -59,32 +63,24 @@ class PostUploadController(
             ImageQuality.HIGH
         }
 
-        val mediaFiles = images.mapIndexed { index, file ->
+        val mediaUrls = images.mapIndexed { index, file ->
             val uploadResult = cloudinaryService.uploadImage(file, "posts", imageQuality)
-            
-            MediaFile(
-                fileUrl = uploadResult.url,
-                fileType = MediaType.IMAGE,
-                orderIndex = index + 1,
-                cloudinaryPublicId = uploadResult.publicId
-            )
+            uploadResult.url
         }
 
-        val post = Post(
-            user = user,
-            caption = caption,
+        val saved = postService.createPost(
+            userId = currentUserId,
+            caption = caption ?: "",
             visibility = Visibility.valueOf(visibilityStr.uppercase()),
-            mediaFiles = mediaFiles
+            mediaUrls = mediaUrls
         )
-
-        val saved = postRepository.save(post)
 
         return ResponseEntity.ok(
             PostUploadResponse(
                 success = true,
                 message = "Post uploaded successfully",
                 postId = saved.id,
-                imageUrls = mediaFiles.map { it.fileUrl }
+                imageUrls = mediaUrls
             )
         )
     }
@@ -124,21 +120,13 @@ class PostUploadController(
 
             val uploadResult = cloudinaryService.uploadImage(image, "posts", imageQuality)
 
-            val mediaFile = MediaFile(
-                fileUrl = uploadResult.url,
-                fileType = MediaType.IMAGE,
-                orderIndex = 1,
-                cloudinaryPublicId = uploadResult.publicId
-            )
-
-            val post = Post(
-                user = user,
-                caption = caption,
+            // Persist post via service
+            postService.createPost(
+                userId = currentUserId,
+                caption = caption ?: "",
                 visibility = Visibility.valueOf(visibilityStr.uppercase()),
-                mediaFiles = listOf(mediaFile)
+                mediaUrls = listOf(uploadResult.url)
             )
-
-            val saved = postRepository.save(post)
 
             return ResponseEntity.ok(
                 UploadResponse(
@@ -166,7 +154,6 @@ class PostUploadController(
     fun uploadAvatar(
         @RequestParam("avatar") avatar: MultipartFile
     ): ResponseEntity<UploadResponse> {
-        
         if (!avatar.contentType?.startsWith("image/")!!) {
             return ResponseEntity.badRequest().body(
                 UploadResponse(success = false, message = "File must be an image")
@@ -174,14 +161,21 @@ class PostUploadController(
         }
 
         val currentUserId = SecurityUtil.getCurrentUserId()
-        val user = userRepository.findById(currentUserId).orElseThrow()
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                UploadResponse(success = false, message = "User not authenticated")
+            )
+
+        val user = userRepository.findById(currentUserId).orElseThrow { RuntimeException("User not found") }
 
         try {
-            // Delete old avatar if exists
+            // Attempt to delete old avatar if exists, but don't fail the whole request on delete error
             user.avatarUrl?.let { oldUrl ->
-                // Extract publicId from URL and delete
-                val publicIdMatch = Regex("avatars/[^/]+").find(oldUrl)
-                publicIdMatch?.value?.let { cloudinaryService.deleteMedia(it, false) }
+                try {
+                    val publicIdMatch = Regex("avatars/[^/]+").find(oldUrl)
+                    publicIdMatch?.value?.let { cloudinaryService.deleteMedia(it, false) }
+                } catch (e: Exception) {
+                    println("Warning: failed to delete old avatar for user $currentUserId: ${e.message}")
+                }
             }
 
             val uploadResult = cloudinaryService.uploadAvatar(avatar)
@@ -189,6 +183,22 @@ class PostUploadController(
             // Update user avatar
             val updatedUser = user.copy(avatarUrl = uploadResult.url)
             userRepository.save(updatedUser)
+
+            // Evict caches and related redis keys so new avatar propagates quickly
+            try {
+                cacheManager.getCache("feedPosts")?.clear()
+                cacheManager.getCache("userPosts")?.clear()
+            } catch (e: Exception) {
+                println("Warning: failed to evict caches after avatar update for user $currentUserId: ${e.message}")
+            }
+
+            // Invalidate simple redis keys related to the user profile
+            try {
+                redisService.delete("user:${currentUserId}:stats")
+                redisService.delete("user:${currentUserId}:profile")
+            } catch (e: Exception) {
+                println("Warning: failed to evict redis keys after avatar update for user $currentUserId: ${e.message}")
+            }
 
             return ResponseEntity.ok(
                 UploadResponse(

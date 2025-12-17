@@ -59,12 +59,13 @@ class CloudinaryService(private val cloudinary: Cloudinary) {
             VideoQuality.LOW -> VideoConfig(854, 480, "1m", "96k")
         }
         
+        // Always enforce highest-quality encoding for uploads
         val uploadParams = ObjectUtils.asMap(
             "resource_type", "video",
             "folder", folder,
             "format", "mp4",
-            "quality", "auto:best",
-            "transformation", "w_${width},h_${height},c_limit,vc_h264,ac_aac,br_${videoBitrate},q_auto:best"
+            "quality", "100",
+            "transformation", "w_${width},h_${height},c_limit,vc_h264,ac_aac,br_${videoBitrate},q_100"
         )
 
         val result = cloudinary.uploader().upload(file.bytes, uploadParams)
@@ -109,16 +110,17 @@ class CloudinaryService(private val cloudinary: Cloudinary) {
             ImageQuality.LOW -> Pair(720, 720)         // Standard
         }
         
+        // Force maximum image quality and sharpen to preserve detail
         val uploadParams = ObjectUtils.asMap(
             "resource_type", "image",
             "folder", folder,
-            "quality", "auto:best",
+            "quality", "100",
             "fetch_format", "auto",
             "colors", true,
             "faces", true,
             "image_metadata", true,
             "phash", true,
-            "transformation", "w_${maxWidth},h_${maxHeight},c_limit,q_auto:best,f_auto"
+            "transformation", "w_${maxWidth},h_${maxHeight},c_limit,q_100,f_auto,e_sharpen:200"
         )
 
         val result = cloudinary.uploader().upload(file.bytes, uploadParams)
@@ -144,14 +146,15 @@ class CloudinaryService(private val cloudinary: Cloudinary) {
      * Upload avatar với tối ưu hóa đặc biệt cho ảnh đại diện
      */
     fun uploadAvatar(file: MultipartFile): MediaUploadResult {
+        // Avatars should always be uploaded at highest quality with face focus
         val uploadParams = ObjectUtils.asMap(
             "resource_type", "image",
             "folder", "avatars",
-            "quality", "auto:best",
+            "quality", "100",
             "fetch_format", "auto",
             "faces", true,
             "colors", true,
-            "transformation", "w_500,h_500,c_fill,g_faces,q_auto:best,r_max,e_sharpen:100"
+            "transformation", "w_500,h_500,c_fill,g_faces,q_100,r_max,e_sharpen:200"
         )
 
         val result = cloudinary.uploader().upload(file.bytes, uploadParams)
@@ -177,7 +180,7 @@ class CloudinaryService(private val cloudinary: Cloudinary) {
         }
         
         // Build URL with transformation parameters directly in the URL
-        return "https://res.cloudinary.com/${cloudinary.config.cloudName}/video/upload/w_${width},h_${height},c_fill,g_auto,q_auto:best,f_auto,e_sharpen:100/${publicId}.jpg"
+        return "https://res.cloudinary.com/${cloudinary.config.cloudName}/video/upload/w_${width},h_${height},c_fill,g_auto,q_100,f_auto,e_sharpen:200/${publicId}.jpg"
     }
 
     fun deleteMedia(publicId: String, isVideo: Boolean = false): Boolean {

@@ -4,9 +4,12 @@ import io.jsonwebtoken.*
 import io.jsonwebtoken.security.Keys
 import org.springframework.stereotype.Component
 import java.util.*
+import org.slf4j.LoggerFactory
 
 @Component
 class JwtUtil(private val jwtProperties: JwtProperties) {
+
+    private val logger = LoggerFactory.getLogger(JwtUtil::class.java)
 
     // Khởi tạo key: nếu có secret trong properties thì dùng đó (hmacShaKeyFor),
     // nếu không có thì fallback sang tạo key ngẫu nhiên
@@ -75,6 +78,7 @@ class JwtUtil(private val jwtProperties: JwtProperties) {
             .parseSignedClaims(token)
             .payload
 
+        logger.debug("Extracted userId from token: ${claims.subject}")
         return claims.subject.toLong()
     }
 
@@ -85,7 +89,9 @@ class JwtUtil(private val jwtProperties: JwtProperties) {
             .parseSignedClaims(token)
             .payload
 
-        return claims["username"] as String
+        val username = claims["username"] as String
+        logger.debug("Extracted username from token: $username")
+        return username
     }
 
     fun getRolesFromToken(token: String): List<String> {
@@ -96,7 +102,9 @@ class JwtUtil(private val jwtProperties: JwtProperties) {
             .payload
 
         @Suppress("UNCHECKED_CAST")
-        return claims["roles"] as List<String>
+        val roles = claims["roles"] as List<String>
+        logger.debug("Extracted roles from token: $roles")
+        return roles
     }
 
     fun getTokenTypeFromToken(token: String): String {
@@ -106,7 +114,9 @@ class JwtUtil(private val jwtProperties: JwtProperties) {
             .parseSignedClaims(token)
             .payload
 
-        return claims["type"] as String
+        val tokenType = claims["type"] as String
+        logger.debug("Extracted token type from token: $tokenType")
+        return tokenType
     }
 
     fun isTokenExpired(token: String): Boolean {

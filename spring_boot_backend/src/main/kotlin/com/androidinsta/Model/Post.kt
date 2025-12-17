@@ -64,7 +64,7 @@ class Post(
         name = "media_files",
         joinColumns = [JoinColumn(name = "post_id")]
     )
-    val mediaFiles: List<MediaFile> = emptyList(),
+    var mediaFiles: MutableList<MediaFile> = mutableListOf(),
 
     @Column(name = "created_at", nullable = false, updatable = false)
     var createdAt: LocalDateTime? = null,

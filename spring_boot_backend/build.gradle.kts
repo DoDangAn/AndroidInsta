@@ -62,6 +62,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.springframework.kafka:spring-kafka-test")
+
+    implementation("org.springframework.kafka:spring-kafka")
+    implementation("javax.annotation:javax.annotation-api:1.3.2")
 }
 
 tasks.withType<KotlinCompile> {

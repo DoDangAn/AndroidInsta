@@ -9,6 +9,11 @@ import org.springframework.data.domain.Pageable
 import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronizationAdapter
+import org.springframework.transaction.support.TransactionSynchronizationManager
+import org.slf4j.LoggerFactory
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 
 @Service
 @Transactional(readOnly = true)
@@ -19,6 +24,8 @@ class MessageService(
     private val redisService: RedisService,
     private val kafkaProducerService: KafkaProducerService
 ) {
+    private val logger = LoggerFactory.getLogger(MessageService::class.java)
+    private val objectMapper = jacksonObjectMapper().registerKotlinModule()
     
     /**
      * Gửi message
@@ -46,29 +53,75 @@ class MessageService(
         )
         
         val savedMessage = messageRepository.save(message)
-        
-        // Invalidate caches
-        redisService.delete("conversation:$senderId")
-        redisService.delete("conversation:$receiverId")
-        redisService.delete("chat:history:$senderId:$receiverId:*")
-        redisService.delete("chat:history:$receiverId:$senderId:*")
-        redisService.delete("unread:messages:$receiverId:$senderId")
-        
-        // Send Kafka event
-        kafkaProducerService.sendMessageSentEvent(
-            messageId = savedMessage.id,
-            senderId = senderId,
-            receiverId = receiverId,
-            content = content ?: ""
-        )
-        
-        // Gửi message qua WebSocket đến receiver
-        messagingTemplate.convertAndSendToUser(
-            receiver.id.toString(),
-            "/queue/messages",
-            savedMessage
-        )
-        
+
+        // Register after-commit work: update Redis counters/lists and publish Kafka event.
+        // This avoids publishing events when the DB transaction rolls back.
+        try {
+            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronizationAdapter() {
+                override fun afterCommit() {
+                    try {
+                        // Increment per-sender unread and total unread for receiver
+                        redisService.increment("unread:messages:$receiverId:$senderId", 1, java.time.Duration.ofDays(30))
+                        redisService.increment("unread:total:$receiverId", 1)
+
+                        // Prepare conversation key (stable ordering)
+                        val convKey = if (senderId < receiverId) "$senderId:$receiverId" else "$receiverId:$senderId"
+
+                        // Push a lightweight summary JSON into recent messages list
+                        val summary = mapOf(
+                            "id" to savedMessage.id,
+                            "senderId" to senderId,
+                            "receiverId" to receiverId,
+                            "content" to (content ?: ""),
+                            "mediaUrl" to (mediaUrl ?: ""),
+                            "createdAt" to (savedMessage.createdAt?.toString() ?: "")
+                        )
+                        val json = objectMapper.writeValueAsString(summary)
+                        redisService.pushToList("chat:history:$convKey", json, 200, java.time.Duration.ofDays(30))
+
+                        // Publish Kafka event for downstream consumers
+                        kafkaProducerService.sendMessageSentEvent(
+                            messageId = savedMessage.id,
+                            senderId = senderId,
+                            receiverId = receiverId,
+                            content = content ?: ""
+                        )
+                    } catch (ex: Exception) {
+                        logger.error("Error in afterCommit hooks for message ${savedMessage.id}", ex)
+                    }
+                }
+            })
+        } catch (e: Exception) {
+            logger.error("Failed to register transaction synchronization for message ${savedMessage.id}", e)
+            // Best-effort fallback: attempt direct publish/update (do not block)
+            try {
+                redisService.increment("unread:messages:$receiverId:$senderId", 1, java.time.Duration.ofDays(30))
+                redisService.increment("unread:total:$receiverId", 1)
+                val convKey = if (senderId < receiverId) "$senderId:$receiverId" else "$receiverId:$senderId"
+                val summary = mapOf(
+                    "id" to savedMessage.id,
+                    "senderId" to senderId,
+                    "receiverId" to receiverId,
+                    "content" to (content ?: ""),
+                    "mediaUrl" to (mediaUrl ?: ""),
+                    "createdAt" to (savedMessage.createdAt?.toString() ?: "")
+                )
+                val json = objectMapper.writeValueAsString(summary)
+                redisService.pushToList("chat:history:$convKey", json, 200, java.time.Duration.ofDays(30))
+                kafkaProducerService.sendMessageSentEvent(
+                    messageId = savedMessage.id,
+                    senderId = senderId,
+                    receiverId = receiverId,
+                    content = content ?: ""
+                )
+            } catch (ex: Exception) {
+                logger.error("Fallback publish failed for message ${savedMessage.id}", ex)
+            }
+        }
+
+        // Note: WebSocket push được xử lý bởi WebSocketChatController.handleChatMessage()
+        // Không gửi message ở đây để tránh duplicate
+
         return savedMessage
     }
     

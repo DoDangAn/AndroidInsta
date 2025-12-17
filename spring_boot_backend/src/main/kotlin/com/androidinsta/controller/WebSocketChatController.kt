@@ -27,16 +27,15 @@ class WebSocketChatController(
     /**
      * Nhận message từ client qua WebSocket
      * Client gửi đến: /app/chat
-     * Response gửi về: /user/{username}/queue/messages
+     * Real-time: Gửi đến CẢ NGƯỜI GỬI & NGƯỜI NHẬN ngay lập tức
      */
     @MessageMapping("/chat")
-    @SendToUser("/queue/messages")
     fun handleChatMessage(
         @Payload request: SendMessageRequest,
         headerAccessor: SimpMessageHeaderAccessor,
         principal: Principal?
-    ): MessageDto {
-        val senderId = principal?.name?.toLongOrNull() 
+    ) {
+        val senderId = principal?.name?.toLongOrNull()
             ?: throw IllegalStateException("User not authenticated")
         
         val messageType = try {
@@ -53,7 +52,20 @@ class WebSocketChatController(
             messageType = messageType
         )
         
-        return message.toDto()
+        val messageDto = message.toDto()
+
+        messagingTemplate.convertAndSendToUser(
+            request.receiverId.toString(),
+            "/queue/messages",
+            messageDto
+        )
+
+        // ✅ Gửi tin nhắn đến NGƯỜI GỬI (confirmation)
+        messagingTemplate.convertAndSendToUser(
+            senderId.toString(),
+            "/queue/messages",
+            messageDto
+        )
     }
     
     /**

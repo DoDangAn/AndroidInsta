@@ -4,6 +4,8 @@ import com.androidinsta.Model.Post
 import com.androidinsta.Model.Visibility
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
+import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer
+import org.springframework.data.redis.serializer.RedisSerializer
 import java.time.LocalDateTime
 
 /**
@@ -81,3 +83,6 @@ data class MediaFileDto(
     @JsonProperty("duration") val duration: Int? = null,
     @JsonProperty("thumbnailUrl") val thumbnailUrl: String? = null
 )
+
+// Add Redis serializer for FeedResponse
+val feedResponseSerializer: RedisSerializer<FeedResponse> = Jackson2JsonRedisSerializer(FeedResponse::class.java)

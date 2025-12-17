@@ -89,28 +89,6 @@ class ChatController(
      * Gửi message
      * POST /api/chat/send
      */
-    @PostMapping("/send")
-    @CacheEvict(value = ["conversations", "chatHistory"], allEntries = true)
-    fun sendMessage(@Valid @RequestBody request: SendMessageRequest): ResponseEntity<MessageDto> {
-        val senderId = SecurityUtil.getCurrentUserId()
-            ?: throw IllegalStateException("User not authenticated")
-        
-        val messageType = try {
-            MessageType.valueOf(request.messageType.lowercase())
-        } catch (e: Exception) {
-            MessageType.text
-        }
-        
-        val message = messageService.sendMessage(
-            senderId = senderId,
-            receiverId = request.receiverId,
-            content = request.content,
-            mediaUrl = request.mediaUrl,
-            messageType = messageType
-        )
-        
-        return ResponseEntity.status(HttpStatus.CREATED).body(message.toDto())
-    }
     
     /**
      * Xóa message

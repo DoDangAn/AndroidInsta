@@ -20,22 +20,34 @@ class PostService(
     private val kafkaProducerService: KafkaProducerService,
     private val redisService: RedisService,
     private val notificationService: NotificationService,
+    private val notificationAsyncService: NotificationAsyncService,
     private val followService: FollowService
 ) {
     
     /**
      * Lấy feed response DTO cho user
-     * DON'T cache complex DTOs - query is fast with database indexes
-     * Professional approach: cache simple counters only, build DTOs fresh
+     * Cache ở Service layer với key pattern: "feed:userId:{userId}:page:{page}"
+     * TTL: 10 minutes (Spring Cache default)
+     *
+     * @param userId ID của user
+     * @param pageable Pagination info (page, size)
+     * @return FeedResponse chứa list của PostDTO, page info
      */
+    @org.springframework.cache.annotation.Cacheable(
+        value = ["feedPosts"],
+        key = "'feed:' + #userId + ':page:' + #pageable.pageNumber + ':size:' + #pageable.pageSize",
+        condition = "#pageable.pageNumber >= 0 && #pageable.pageSize > 0"
+    )
     fun getFeedResponse(userId: Long, pageable: Pageable): com.androidinsta.dto.FeedResponse {
         val posts = getFeedPosts(userId, pageable)
-        return com.androidinsta.dto.FeedResponse(
+        val feedResponse = com.androidinsta.dto.FeedResponse(
             posts = posts.content.map { it.toDto(userId) },
             currentPage = posts.number,
             totalPages = posts.totalPages,
             totalItems = posts.totalElements
         )
+        println("DEBUG: FeedResponse generated for userId=$userId: $feedResponse")
+        return feedResponse
     }
     
     /**
@@ -60,8 +72,19 @@ class PostService(
     
     /**
      * Lấy user posts response DTO
-     * DON'T cache complex DTOs - query is fast with database indexes
+     * Cache ở Service layer với key pattern: "user:posts:userId:{userId}:page:{page}"
+     * TTL: 10 minutes
+     *
+     * @param userId ID của user
+     * @param currentUserId ID của user hiện tại (nullable)
+     * @param pageable Pagination info
+     * @return FeedResponse chứa posts của user
      */
+    @org.springframework.cache.annotation.Cacheable(
+        value = ["userPosts"],
+        key = "'user:posts:' + #userId + ':page:' + #pageable.pageNumber + ':size:' + #pageable.pageSize",
+        condition = "#pageable.pageNumber >= 0 && #pageable.pageSize > 0"
+    )
     fun getUserPostsResponse(userId: Long, currentUserId: Long?, pageable: Pageable): com.androidinsta.dto.FeedResponse {
         val posts = getUserPosts(userId, currentUserId, pageable)
         return com.androidinsta.dto.FeedResponse(
@@ -109,6 +132,10 @@ class PostService(
      * @return Post entity vừa được tạo với ID generated
      * @throws RuntimeException nếu user không tồn tại
      */
+    @org.springframework.cache.annotation.CacheEvict(
+        value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"],
+        allEntries = true
+    )
     @Transactional
     fun createPost(userId: Long, caption: String, visibility: Visibility, mediaUrls: List<String>): Post {
         val user = userRepository.findById(userId)
@@ -121,7 +148,7 @@ class PostService(
                 fileType = if (url.contains(".mp4")) MediaType.VIDEO else MediaType.IMAGE,
                 orderIndex = index
             )
-        }
+        }.toMutableList()
         
         val post = Post(
             user = user,
@@ -136,18 +163,25 @@ class PostService(
         // Only send for PUBLIC posts (not PRIVATE or ADVERTISE)
         if (visibility == Visibility.PUBLIC) {
             val followers = followService.getFollowers(userId)
-            followers.forEach { follower ->
-                try {
-                    notificationService.sendNotification(
-                        receiverId = follower.id,
-                        senderId = userId,
-                        type = com.androidinsta.Model.NotificationType.NEW_POST,
-                        entityId = savedPost.id,
-                        message = null
-                    )
-                } catch (e: Exception) {
-                    println("Error sending notification to follower ${follower.id}: ${e.message}")
-                }
+            if (followers.isNotEmpty()) {
+                // Register afterCommit to ensure post is committed before sending notifications
+                org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    object : org.springframework.transaction.support.TransactionSynchronizationAdapter() {
+                        override fun afterCommit() {
+                            followers.forEach { follower ->
+                                try {
+                                    notificationAsyncService.sendNewPostNotificationAsync(
+                                        receiverId = follower.id,
+                                        senderId = userId,
+                                        postId = savedPost.id
+                                    )
+                                } catch (e: Exception) {
+                                    println("Error scheduling async notification for follower ${follower.id}: ${e.message}")
+                                }
+                            }
+                        }
+                    }
+                )
             }
         }
         
@@ -184,6 +218,10 @@ class PostService(
      * @param userId ID của user thực hiện xóa (must be post owner)
      * @throws RuntimeException nếu post không tồn tại hoặc user không phải chủ
      */
+    @org.springframework.cache.annotation.CacheEvict(
+        value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"],
+        allEntries = true
+    )
     @Transactional
     fun deletePost(postId: Long, userId: Long) {
         val post = postRepository.findById(postId)
@@ -208,8 +246,12 @@ class PostService(
     /**
      * Cập nhật post
      */
+    @org.springframework.cache.annotation.CacheEvict(
+        value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"],
+        allEntries = true
+    )
     @Transactional
-    fun updatePost(postId: Long, userId: Long, caption: String?, visibility: Visibility?): Post {
+    fun updatePost(postId: Long, userId: Long, caption: String?, visibility: Visibility?, mediaUrls: List<String>? = null): Post {
         val post = postRepository.findById(postId)
             .orElseThrow { RuntimeException("Post not found") }
             
@@ -223,6 +265,18 @@ class PostService(
         
         if (visibility != null) {
             post.visibility = visibility
+        }
+
+        // If mediaUrls provided, replace mediaFiles with new list
+        if (mediaUrls != null) {
+            val mediaFilesList = mediaUrls.mapIndexed { index, url ->
+                MediaFile(
+                    fileUrl = url,
+                    fileType = if (url.contains(".mp4")) MediaType.VIDEO else MediaType.IMAGE,
+                    orderIndex = index
+                )
+            }.toMutableList()
+            post.mediaFiles = mediaFilesList
         }
         
         val updated = postRepository.save(post)
@@ -248,6 +302,30 @@ class PostService(
     }
     
     /**
+     * Lấy advertise posts response DTO
+     * Cache ở Service layer với key pattern: "advertise:posts:page:{page}"
+     * TTL: 10 minutes
+     *
+     * @param pageable Pagination info
+     * @param currentUserId ID của user hiện tại (nullable)
+     * @return FeedResponse chứa advertise posts
+     */
+    @org.springframework.cache.annotation.Cacheable(
+        value = ["advertisePosts"],
+        key = "'advertise:posts:page:' + #pageable.pageNumber + ':size:' + #pageable.pageSize",
+        condition = "#pageable.pageNumber >= 0 && #pageable.pageSize > 0"
+    )
+    fun getAdvertisePostsResponse(pageable: Pageable, currentUserId: Long?): FeedResponse {
+        val posts = getAdvertisePosts(pageable)
+        return FeedResponse(
+            posts = posts.content.map { it.toDto(currentUserId) },
+            currentPage = posts.number,
+            totalPages = posts.totalPages,
+            totalItems = posts.totalElements
+        )
+    }
+
+    /**
      * Lấy một post theo ID với permission check
      * 
      * Permission Logic:
@@ -255,7 +333,9 @@ class PostService(
      * - PRIVATE: Chỉ chủ post xem được
      * 
      * Cache Strategy:
-     * - Cache key: "post:detail:postId:userId" (10 minutes TTL)
+     * - Cache ở Service layer
+     * - Cache key: "post:detail:{postId}:userId:{userId}"
+     * - TTL: 10 minutes
      * - Separate cache cho mỗi user vì permission khác nhau
      * - Guest users: userId = "guest"
      * 
@@ -264,8 +344,11 @@ class PostService(
      * @return Post entity với lazy-loaded relationships
      * @throws RuntimeException nếu post không tồn tại hoặc không có permission
      */
+    @org.springframework.cache.annotation.Cacheable(
+        value = ["postDetail"],
+        key = "'post:detail:' + #postId + ':userId:' + (#currentUserId != null ? #currentUserId : 'guest')"
+    )
     fun getPostById(postId: Long, currentUserId: Long?): Post {
-        // DON'T cache Post entity - too complex, query is fast with DB indexes
         val post = postRepository.findById(postId)
             .orElseThrow { RuntimeException("Post not found") }
         
@@ -282,7 +365,6 @@ class PostService(
             }
         }
         
-        // DON'T cache Post entity - too complex, query is fast with DB indexes
         return post
     }
 }

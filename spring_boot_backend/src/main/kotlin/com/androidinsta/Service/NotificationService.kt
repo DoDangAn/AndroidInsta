@@ -13,6 +13,11 @@ import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronizationAdapter
+import org.springframework.transaction.support.TransactionSynchronizationManager
+import org.slf4j.LoggerFactory
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import java.time.LocalDateTime
 
 @Service
@@ -22,8 +27,11 @@ class NotificationService(
     private val userRepository: UserRepository,
     private val kafkaTemplate: KafkaTemplate<String, NotificationEvent>,
     private val messagingTemplate: SimpMessagingTemplate,
-    private val redisService: RedisService
+    private val redisService: RedisService,
+    private val kafkaProducerService: KafkaProducerService
 ) {
+    private val logger = LoggerFactory.getLogger(NotificationService::class.java)
+    private val objectMapper = jacksonObjectMapper().registerKotlinModule()
 
     companion object {
         const val NOTIFICATION_TOPIC = "notification-events"
@@ -46,7 +54,32 @@ class NotificationService(
             entityId = entityId,
             message = message
         )
-        kafkaTemplate.send(NOTIFICATION_TOPIC, event)
+
+        // Publish after DB transaction commit to avoid sending events for rolled-back work
+        try {
+            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronizationAdapter() {
+                override fun afterCommit() {
+                    try {
+                        // Use KafkaProducerService for unified publishing (audit/analytics)
+                        kafkaProducerService.sendNotificationEvent(
+                            receiverId,
+                            "${type.name}",
+                            message ?: "",
+                            type.name
+                        )
+                    } catch (ex: Exception) {
+                        logger.error("Failed to publish notification event after commit", ex)
+                    }
+                }
+            })
+        } catch (e: Exception) {
+            logger.error("Failed to register afterCommit for notification event, falling back to immediate send", e)
+            try {
+                kafkaTemplate.send(NOTIFICATION_TOPIC, event)
+            } catch (ex: Exception) {
+                logger.error("Fallback immediate kafka send failed", ex)
+            }
+        }
     }
 
     /**
@@ -73,18 +106,175 @@ class NotificationService(
 
             val saved = notificationRepository.save(notification)
 
-            // Invalidate unread count cache
-            redisService.delete("notification:unread:count:${event.receiverId}")
+            // After commit: update Redis counters/lists and push realtime
+            try {
+                TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronizationAdapter() {
+                    override fun afterCommit() {
+                        try {
+                            // Increment unread counter
+                            redisService.increment("notification:unread:count:${event.receiverId}", 1, java.time.Duration.ofDays(30))
 
-            // Gửi real-time notification qua WebSocket
-            val response = toNotificationResponse(saved)
-            messagingTemplate.convertAndSendToUser(
-                event.receiverId.toString(),
-                "/queue/notifications",
-                response
-            )
+                            // Push recent notification summary into Redis list
+                            val summary = mapOf(
+                                "id" to saved.id,
+                                "senderId" to saved.sender.id,
+                                "senderUsername" to saved.sender.username,
+                                "senderAvatarUrl" to saved.sender.avatarUrl,
+                                "type" to saved.type.name,
+                                "entityId" to saved.entityId,
+                                "isRead" to saved.isRead,
+                                "createdAt" to (saved.createdAt?.toString() ?: "")
+                            )
+                            val json = objectMapper.writeValueAsString(summary)
+                            redisService.pushToList("notifications:recent:${event.receiverId}", json, 200, java.time.Duration.ofDays(30))
+
+                            // Send real-time notification via WebSocket
+                            val response = toNotificationResponse(saved)
+                            messagingTemplate.convertAndSendToUser(
+                                event.receiverId.toString(),
+                                "/queue/notifications",
+                                response
+                            )
+                        } catch (ex: Exception) {
+                            logger.error("Error in afterCommit handling for notification ${saved.id}", ex)
+                        }
+                    }
+                })
+            } catch (ex: Exception) {
+                logger.error("Failed to register afterCommit for notification handling", ex)
+                // Best-effort immediate actions
+                redisService.increment("notification:unread:count:${event.receiverId}", 1, java.time.Duration.ofDays(30))
+                val summary = mapOf(
+                    "id" to saved.id,
+                    "senderId" to saved.sender.id,
+                    "senderUsername" to saved.sender.username,
+                    "senderAvatarUrl" to saved.sender.avatarUrl,
+                    "type" to saved.type.name,
+                    "entityId" to saved.entityId,
+                    "isRead" to saved.isRead,
+                    "createdAt" to (saved.createdAt?.toString() ?: "")
+                )
+                val json = objectMapper.writeValueAsString(summary)
+                redisService.pushToList("notifications:recent:${event.receiverId}", json, 200, java.time.Duration.ofDays(30))
+                val response = toNotificationResponse(saved)
+                messagingTemplate.convertAndSendToUser(
+                    event.receiverId.toString(),
+                    "/queue/notifications",
+                    response
+                )
+            }
         } catch (e: Exception) {
             println("Error handling notification: ${e.message}")
+        }
+    }
+
+    /**
+     * Tạo notification trực tiếp (synchronous) — lưu vào DB và gửi realtime.
+     * Không publish Kafka để tránh duplicate khi caller muốn immediate persistence.
+     */
+    fun createNotification(
+        receiverId: Long,
+        senderId: Long,
+        type: NotificationType,
+        entityId: Long?,
+        message: String?
+    ) {
+        try {
+            if (receiverId == senderId) return
+
+            val sender = userRepository.findById(senderId).orElse(null) ?: return
+            val receiver = userRepository.findById(receiverId).orElse(null) ?: return
+
+            val notification = Notification(
+                sender = sender,
+                receiver = receiver,
+                type = type,
+                entityId = entityId
+            )
+
+            val saved = notificationRepository.save(notification)
+
+            // Register after-commit actions: invalidate caches, push Redis lists, send realtime and publish audit event
+            try {
+                TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronizationAdapter() {
+                    override fun afterCommit() {
+                        try {
+                            // Increment unread counter
+                            redisService.increment("notification:unread:count:$receiverId", 1, java.time.Duration.ofDays(30))
+
+                            // Push recent notification summary
+                            val summary = mapOf(
+                                "id" to saved.id,
+                                "senderId" to saved.sender.id,
+                                "senderUsername" to saved.sender.username,
+                                "senderAvatarUrl" to saved.sender.avatarUrl,
+                                "type" to saved.type.name,
+                                "entityId" to saved.entityId,
+                                "isRead" to saved.isRead,
+                                "createdAt" to (saved.createdAt?.toString() ?: "")
+                            )
+                            val json = objectMapper.writeValueAsString(summary)
+                            redisService.pushToList("notifications:recent:$receiverId", json, 200, java.time.Duration.ofDays(30))
+
+                            // Send real-time notification via WebSocket
+                            val response = toNotificationResponse(saved)
+                            messagingTemplate.convertAndSendToUser(
+                                receiverId.toString(),
+                                "/queue/notifications",
+                                response
+                            )
+
+                            // Publish an audit/analytics event to Kafka for downstream consumers
+                            try {
+                                kafkaProducerService.sendNotificationEvent(
+                                    receiverId,
+                                    "${sender.username} - ${type.name}",
+                                    message ?: "",
+                                    type.name
+                                )
+                            } catch (e: Exception) {
+                                logger.error("Error publishing notification event to Kafka: ${e.message}")
+                            }
+                        } catch (ex: Exception) {
+                            logger.error("Error in afterCommit for createNotification ${saved.id}", ex)
+                        }
+                    }
+                })
+            } catch (ex: Exception) {
+                logger.error("Failed to register afterCommit for createNotification", ex)
+                // Best-effort immediate actions
+                redisService.increment("notification:unread:count:$receiverId", 1, java.time.Duration.ofDays(30))
+                val summary = mapOf(
+                    "id" to saved.id,
+                    "senderId" to saved.sender.id,
+                    "senderUsername" to saved.sender.username,
+                    "senderAvatarUrl" to saved.sender.avatarUrl,
+                    "type" to saved.type.name,
+                    "entityId" to saved.entityId,
+                    "isRead" to saved.isRead,
+                    "createdAt" to (saved.createdAt?.toString() ?: "")
+                )
+                val json = objectMapper.writeValueAsString(summary)
+                redisService.pushToList("notifications:recent:$receiverId", json, 200, java.time.Duration.ofDays(30))
+                val response = toNotificationResponse(saved)
+                messagingTemplate.convertAndSendToUser(
+                    receiverId.toString(),
+                    "/queue/notifications",
+                    response
+                )
+                try {
+                    kafkaProducerService.sendNotificationEvent(
+                        receiverId,
+                        "${sender.username} - ${type.name}",
+                        message ?: "",
+                        type.name
+                    )
+                } catch (e: Exception) {
+                    logger.error("Fallback kafka publish failed: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            println("Error creating notification: ${e.message}")
         }
     }
 

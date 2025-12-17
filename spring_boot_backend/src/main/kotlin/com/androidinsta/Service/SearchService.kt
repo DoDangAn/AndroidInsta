@@ -38,17 +38,17 @@ class SearchService(
      * @return Page of UserSearchResult với follow status
      */
     fun searchUsers(keyword: String, pageable: Pageable, currentUserId: Long? = null): Page<UserSearchResult> {
-        // DON'T cache Page<UserSearchResult> - complex DTO, query is fast with DB indexes
-        val users = userRepository.searchUsers(keyword)
-        
-        val results = users.map { user ->
+        // Use DB-side paged query for users to avoid loading all results into memory
+        val usersPage = userRepository.searchUsersPaged(keyword, pageable)
+
+        val mapped = usersPage.map { user ->
             val followersCount = followRepository.countByFollowedId(user.id)
             val isFollowing = if (currentUserId != null && currentUserId != user.id) {
                 followRepository.existsByFollowerIdAndFollowedId(currentUserId, user.id)
             } else {
                 false
             }
-            
+
             UserSearchResult(
                 id = user.id,
                 username = user.username,
@@ -59,18 +59,8 @@ class SearchService(
                 isFollowing = isFollowing
             )
         }
-        
-        // Manual pagination vì searchUsers trả về List
-        val start = pageable.offset.toInt()
-        val end = minOf(start + pageable.pageSize, results.size)
-        val pageContent = if (start < results.size) results.subList(start, end) else emptyList()
-        
-        // DON'T cache Page<SearchResult> - complex DTO, search is fast with DB indexes
-        return org.springframework.data.domain.PageImpl(
-            pageContent,
-            pageable,
-            results.size.toLong()
-        )
+
+        return mapped
     }
 
     /**
@@ -104,20 +94,9 @@ class SearchService(
      * @return Page of PostSearchResult (filtered for videos)
      */
     fun searchReels(keyword: String, pageable: Pageable): Page<PostSearchResult> {
-        return postRepository.searchPosts(keyword, pageable)
+        // Use a DB-side query that only returns posts with video media
+        return postRepository.searchReels(keyword, pageable)
             .map { post -> toPostSearchResult(post) }
-            .map { it }
-            .let { page ->
-                // Filter only video posts
-                val videoResults = page.content.filter { result ->
-                    result.mediaFiles.any { it.fileType == MediaType.VIDEO }
-                }
-                org.springframework.data.domain.PageImpl(
-                    videoResults,
-                    pageable,
-                    videoResults.size.toLong()
-                )
-            }
     }
 
     /**
@@ -150,16 +129,24 @@ class SearchService(
      */
     fun searchAll(keyword: String): SearchAllResult {
         val pageable = PageRequest.of(0, 10)
-        
+
+        val cacheKey = "search:all:preview:${'$'}{keyword.trim().lowercase()}"
+        val cached = redisService.get(cacheKey, SearchAllResult::class.java)
+        if (cached != null) return cached
+
         val users = searchUsers(keyword, pageable).content
         val posts = searchPosts(keyword, pageable).content
         val tags = searchTags(keyword, pageable).content
-        
-        return SearchAllResult(
+
+        val result = SearchAllResult(
             users = users,
             posts = posts,
             tags = tags
         )
+
+        // Cache short-lived preview
+        redisService.set(cacheKey, result, java.time.Duration.ofSeconds(60))
+        return result
     }
 
     /**
@@ -174,8 +161,17 @@ class SearchService(
      * @return Page of TagSearchResult sorted by post count
      */
     fun getTrendingTags(pageable: Pageable): Page<TagSearchResult> {
-        return tagRepository.findTrendingTags(pageable)
-            .map { tag -> toTagSearchResult(tag) }
+        val key = "search:trending:tags:page:${'$'}{pageable.pageNumber}:size:${'$'}{pageable.pageSize}"
+        // Unable to deserialize Page generics easily; use simple cache for list
+        val cachedList = redisService.get(key + ":list", List::class.java) as? List<TagSearchResult>
+        if (!cachedList.isNullOrEmpty()) {
+            return org.springframework.data.domain.PageImpl(cachedList, pageable, cachedList.size.toLong())
+        }
+
+        val page = tagRepository.findTrendingTags(pageable).map { tag -> toTagSearchResult(tag) }
+        // Cache list form
+        redisService.set(key + ":list", page.content, java.time.Duration.ofMinutes(5))
+        return page
     }
 
     // Helper methods

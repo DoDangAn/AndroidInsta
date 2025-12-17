@@ -43,6 +43,21 @@ interface UserRepository : JpaRepository<User, Long> {
             u.isVerified DESC
     """)
     fun searchUsers(keyword: String): List<User>
+
+    @Query("""
+        SELECT DISTINCT u FROM User u 
+        WHERE u.isActive = true 
+        AND (LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')) 
+             OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')))
+        ORDER BY 
+            CASE 
+                WHEN LOWER(u.username) = LOWER(:keyword) THEN 0
+                WHEN LOWER(u.username) LIKE LOWER(CONCAT(:keyword, '%')) THEN 1
+                ELSE 2
+            END,
+            u.isVerified DESC
+    """)
+    fun searchUsersPaged(keyword: String, pageable: Pageable): Page<User>
     
     // Search with pagination
     fun findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(

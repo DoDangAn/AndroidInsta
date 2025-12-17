@@ -1,15 +1,19 @@
 package com.androidinsta.config
 
+
 import org.apache.kafka.clients.admin.NewTopic
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.annotation.EnableKafka
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.config.TopicBuilder
+import org.springframework.kafka.core.ConsumerFactory
+import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.support.converter.JsonMessageConverter
 import org.springframework.kafka.support.converter.RecordMessageConverter
-import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.util.backoff.FixedBackOff
 import java.time.Duration
+
 
 /**
  * Kafka Configuration for AndroidInsta
@@ -68,7 +72,22 @@ class KafkaConfig {
     // ===========================
     // Message Converter
     // ===========================
-    
+    @Bean
+    fun kafkaListenerContainerFactory(
+        consumerFactory: ConsumerFactory<String, String>
+    ): ConcurrentKafkaListenerContainerFactory<String, String> {
+
+        val factory = ConcurrentKafkaListenerContainerFactory<String, String>()
+        factory.consumerFactory = consumerFactory
+
+        // Giảm CPU khi không có message
+        factory.containerProperties.idleBetweenPolls = 1000L
+
+        // Không cho Spring tự tạo nhiều thread
+        factory.setConcurrency(1)
+
+        return factory
+    }
     @Bean
     fun kafkaMessageConverter(): RecordMessageConverter {
         return JsonMessageConverter()

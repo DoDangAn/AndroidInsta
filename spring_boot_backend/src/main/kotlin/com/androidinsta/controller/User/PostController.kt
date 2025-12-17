@@ -2,6 +2,7 @@ package com.androidinsta.controller.User
 
 import com.androidinsta.Service.PostService
 import com.androidinsta.Service.LikeService
+import com.androidinsta.Service.CloudinaryService
 import com.androidinsta.Model.Visibility
 import com.androidinsta.config.SecurityUtil
 import com.androidinsta.dto.*
@@ -20,7 +21,8 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/posts")
 class PostController(
     private val postService: PostService,
-    private val likeService: LikeService
+    private val likeService: LikeService,
+    private val cloudinaryService: CloudinaryService
 ) {
     
     /**
@@ -33,9 +35,8 @@ class PostController(
      * 
      * KHÔNG hiển thị random public posts từ người lạ
      * 
-     * Cached at Service layer với key: userId_page_size
-     * Cache sẽ bị invalidate khi có post mới được tạo
-     * 
+     * Cache: Được xử lý bởi PostService.getFeedResponse() (Service layer)
+     *
      * @param page Page number (default: 0)
      * @param size Page size (default: 20)
      * @return FeedResponse chứa danh sách posts được phân trang
@@ -45,9 +46,11 @@ class PostController(
         @RequestParam(value = "page", required = false, defaultValue = "0") page: Int,
         @RequestParam(value = "size", required = false, defaultValue = "20") size: Int
     ): ResponseEntity<FeedResponse> {
-        val userId = SecurityUtil.getCurrentUserId()
-            ?: throw IllegalStateException("User not authenticated")
-        
+        if (!SecurityUtil.isAuthenticated()) {
+            throw IllegalStateException("User not authenticated")
+        }
+
+        val userId = SecurityUtil.getCurrentUserIdOrNull() ?: throw IllegalStateException("User not authenticated")
         val pageable = PageRequest.of(page, size, Sort.by("createdAt").descending())
         val response = postService.getFeedResponse(userId, pageable)
         return ResponseEntity.ok(response)
@@ -55,6 +58,8 @@ class PostController(
     
     /**
      * GET /api/posts/user/{userId} - Get user's posts
+     *
+     * Cache: Được xử lý bởi PostService.getUserPostsResponse() (Service layer)
      */
     @GetMapping("/user/{userId}")
     fun getUserPosts(
@@ -70,6 +75,8 @@ class PostController(
     
     /**
      * GET /api/posts/{postId} - Get post details
+     *
+     * Cache: Được xử lý bởi PostService.getPostById() (Service layer)
      */
     @GetMapping("/{postId}")
     fun getPost(@PathVariable postId: Long): ResponseEntity<PostDto> {
@@ -81,24 +88,19 @@ class PostController(
     /**
      * GET /api/posts/advertise - Get recent PUBLIC posts (last 7 days)
      * Hiển thị các bài viết PUBLIC được đăng trong vòng 1 tuần gần đây
+     *
+     * Cache: Được xử lý bởi PostService.getAdvertisePostsResponse() (Service layer)
      */
     @GetMapping("/advertise")
     fun getAdvertisePosts(
         @RequestParam(value = "page", required = false, defaultValue = "0") page: Int,
         @RequestParam(value = "size", required = false, defaultValue = "10") size: Int
     ): ResponseEntity<FeedResponse> {
-        val currentUserId = SecurityUtil.getCurrentUserId()
         val pageable = PageRequest.of(page, size)
-        val posts = postService.getAdvertisePosts(pageable)
-        
-        return ResponseEntity.ok(
-            FeedResponse(
-                posts = posts.content.map { it.toDto(currentUserId) },
-                currentPage = posts.number,
-                totalPages = posts.totalPages,
-                totalItems = posts.totalElements
-            )
-        )
+        val currentUserId = SecurityUtil.getCurrentUserId()
+        val response = postService.getAdvertisePostsResponse(pageable, currentUserId)
+
+        return ResponseEntity.ok(response)
     }
     
     /**
@@ -121,24 +123,6 @@ class PostController(
      * @param request CreatePostRequest DTO đã validated
      * @return PostDto với HTTP 201 status
      */
-    @PostMapping
-    @org.springframework.cache.annotation.CacheEvict(
-        value = ["feedPosts", "userPosts", "advertisePosts", "postDetail"], 
-        allEntries = true
-    )
-    fun createPost(@Valid @RequestBody request: CreatePostRequest): ResponseEntity<PostDto> {
-        val userId = SecurityUtil.getCurrentUserId()
-            ?: throw IllegalStateException("User not authenticated")
-        
-        val post = postService.createPost(
-            userId = userId,
-            caption = request.caption,
-            visibility = Visibility.valueOf(request.visibility),
-            mediaUrls = request.mediaUrls
-        )
-        
-        return ResponseEntity.status(HttpStatus.CREATED).body(post.toDto(userId))
-    }
     
     /**
      * PUT /api/posts/{postId} - Update post
@@ -150,18 +134,49 @@ class PostController(
     )
     fun updatePost(
         @PathVariable postId: Long,
-        @Valid @RequestBody request: PostUpdateRequest
+        @RequestParam("caption", required = false) caption: String?,
+        @RequestParam("visibility", required = false) visibilityStr: String?,
+        @RequestParam("mediaUrls", required = false) mediaUrls: List<String>?,
+        @RequestParam("images", required = false) images: Array<org.springframework.web.multipart.MultipartFile>?
     ): ResponseEntity<PostDto> {
         val userId = SecurityUtil.getCurrentUserId()
             ?: throw IllegalStateException("User not authenticated")
-            
+
+        // Resolve visibility param
+        val visibility = try {
+            visibilityStr?.let { Visibility.valueOf(it) }
+        } catch (e: Exception) {
+            null
+        }
+
+        // Build final mediaUrls: upload images first if provided, then append mediaUrls
+        val finalMediaUrls = mutableListOf<String>()
+
+        if (images != null && images.isNotEmpty()) {
+            if (images.size > 10) throw IllegalArgumentException("Maximum 10 images per post")
+            images.forEach { file ->
+                if (!file.contentType?.startsWith("image/")!!) {
+                    throw IllegalArgumentException("All files must be images")
+                }
+            }
+            images.forEach { file ->
+                val uploadResult = cloudinaryService.uploadImage(file, "posts", com.androidinsta.Service.ImageQuality.HIGH)
+                finalMediaUrls.add(uploadResult.url)
+            }
+        }
+
+        if (mediaUrls != null && mediaUrls.isNotEmpty()) {
+            finalMediaUrls.addAll(mediaUrls)
+        }
+
         val updatedPost = postService.updatePost(
             postId = postId,
             userId = userId,
-            caption = request.caption,
-            visibility = request.visibility
+            caption = caption,
+            visibility = visibility,
+            mediaUrls = if (finalMediaUrls.isEmpty()) null else finalMediaUrls
         )
-        
+
         return ResponseEntity.ok(updatedPost.toDto(userId))
     }
     
