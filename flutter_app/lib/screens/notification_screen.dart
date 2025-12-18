@@ -36,8 +36,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
         _isLoading = false;
       });
       
-      // Mark all as read when opening screen
-      _notificationService.markAllAsRead();
+      // Mark all as read when opening screen and wait for completion
+      await _notificationService.markAllAsRead();
     } catch (e) {
       setState(() {
         _error = e.toString();

@@ -23,7 +23,11 @@ class UserProfile {
     this.updatedAt,
   });
 
-  factory UserProfile.fromJson(Map<String, dynamic> json) {
+  // Added null check for JSON
+  factory UserProfile.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      throw ArgumentError('JSON cannot be null');
+    }
     return UserProfile(
       id: json['id'] ?? 0,
       username: json['username'] ?? '',
@@ -51,6 +55,21 @@ class UserProfile {
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };
+  }
+
+  static UserProfile empty() {
+    return UserProfile(
+      id: 0,
+      username: '',
+      email: '',
+      fullName: null,
+      bio: null,
+      avatarUrl: null,
+      isVerified: false,
+      isActive: true,
+      createdAt: '',
+      updatedAt: null,
+    );
   }
 }
 

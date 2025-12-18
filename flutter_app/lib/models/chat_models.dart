@@ -91,13 +91,45 @@ class ChatMessage {
       createdAtStr = DateTime.now().toIso8601String();
     }
     
+    // Support two possible server shapes:
+    // 1) Flat fields: senderId, senderUsername, receiverId, receiverUsername (Primary)
+    // 2) Nested sender/receiver objects: { sender: {id, username, ...}, receiver: {...} }
+    UserSummary sender;
+    UserSummary receiver;
+
+    if (json.containsKey('senderId') && json['senderId'] != null) {
+      sender = UserSummary(
+        id: json['senderId'] ?? 0,
+        username: json['senderUsername'] ?? '',
+        fullName: json['senderFullName'],
+        avatarUrl: json['senderAvatarUrl'],
+      );
+    } else if (json['sender'] != null && json['sender'] is Map) {
+      sender = UserSummary.fromJson(json['sender']);
+    } else {
+      sender = UserSummary(id: 0, username: 'Unknown');
+    }
+
+    if (json.containsKey('receiverId') && json['receiverId'] != null) {
+      receiver = UserSummary(
+        id: json['receiverId'] ?? 0,
+        username: json['receiverUsername'] ?? '',
+        fullName: json['receiverFullName'],
+        avatarUrl: json['receiverAvatarUrl'],
+      );
+    } else if (json['receiver'] != null && json['receiver'] is Map) {
+      receiver = UserSummary.fromJson(json['receiver']);
+    } else {
+      receiver = UserSummary(id: 0, username: 'Unknown');
+    }
+
     return ChatMessage(
       id: json['id'] ?? 0,
       content: json['content'],
       mediaUrl: json['mediaUrl'],
-      messageType: json['messageType'] ?? 'TEXT',
-      sender: UserSummary.fromJson(json['sender'] ?? {}),
-      receiver: UserSummary.fromJson(json['receiver'] ?? {}),
+      messageType: (json['messageType'] ?? 'TEXT').toString(),
+      sender: sender,
+      receiver: receiver,
       isRead: json['isRead'] ?? false,
       createdAt: createdAtStr,
     );

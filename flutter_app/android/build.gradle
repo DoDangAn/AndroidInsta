@@ -24,6 +24,15 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// Configure ext.flutter for plugins that need it
+ext {
+    flutter = [
+        compileSdkVersion: 34,
+        minSdkVersion    : 23,
+        targetSdkVersion : 34
+    ]
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }

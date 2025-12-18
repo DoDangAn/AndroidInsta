@@ -192,7 +192,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     backgroundColor: Colors.grey[300],
                     child: (_newAvatarUrl ?? widget.userProfile.avatarUrl) == null
                         ? Text(
-                            widget.userProfile.username[0].toUpperCase(),
+                            widget.userProfile.username.isNotEmpty 
+                                ? widget.userProfile.username[0].toUpperCase()
+                                : 'U',
                             style: const TextStyle(
                               fontSize: 40,
                               fontWeight: FontWeight.bold,

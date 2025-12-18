@@ -81,8 +81,22 @@ class LikeService(
     fun getLikeCount(postId: Long): Long {
         // ✅ Cache simple counter (Long) - this is good!
         val cacheKey = "post:${postId}:likeCount"
-        val cached = redisService.get(cacheKey, Long::class.java)
-        if (cached != null) return cached
+        
+        // Use generic get() and handle both Integer and Long from Redis
+        val cached = redisService.get(cacheKey)
+        if (cached != null) {
+            return when (cached) {
+                is Long -> cached
+                is Int -> cached.toLong()
+                is Number -> cached.toLong()
+                else -> {
+                    // Invalid type, recompute
+                    val count = likeRepository.countByPostId(postId)
+                    redisService.set(cacheKey, count, java.time.Duration.ofMinutes(10))
+                    count
+                }
+            }
+        }
         
         val count = likeRepository.countByPostId(postId)
         redisService.set(cacheKey, count, java.time.Duration.ofMinutes(10))

@@ -28,7 +28,11 @@ class UserService {
     );
 
     if (response.statusCode == 200) {
-      return UserProfile.fromJson(jsonDecode(response.body));
+      final jsonResponse = jsonDecode(response.body);
+      final data = (jsonResponse is Map<String, dynamic> && jsonResponse.containsKey('data'))
+          ? jsonResponse['data']
+          : jsonResponse;
+      return UserProfile.fromJson(data);
     } else {
       throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
@@ -47,7 +51,11 @@ class UserService {
     );
 
     if (response.statusCode == 200) {
-      return UserProfile.fromJson(jsonDecode(response.body));
+      final jsonResponse = jsonDecode(response.body);
+      final data = (jsonResponse is Map<String, dynamic> && jsonResponse.containsKey('data'))
+          ? jsonResponse['data']
+          : jsonResponse;
+      return UserProfile.fromJson(data);
     } else {
       throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
@@ -147,7 +155,9 @@ class UserService {
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+      final jsonResponse = jsonDecode(response.body);
+      // Handle both direct array and wrapped response
+      final data = jsonResponse is List ? jsonResponse : (jsonResponse['data'] ?? jsonResponse);
       return (data as List).map((u) => UserProfile.fromJson(u)).toList();
     } else {
       throw ApiErrorParser.parseError(response.statusCode, response.body);
@@ -167,7 +177,9 @@ class UserService {
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+      final jsonResponse = jsonDecode(response.body);
+      // Handle both direct array and wrapped response
+      final data = jsonResponse is List ? jsonResponse : (jsonResponse['data'] ?? jsonResponse);
       return (data as List).map((u) => UserProfile.fromJson(u)).toList();
     } else {
       throw ApiErrorParser.parseError(response.statusCode, response.body);

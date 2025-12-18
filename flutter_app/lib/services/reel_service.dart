@@ -85,19 +85,19 @@ class ReelService {
     int size = 20,
   }) async {
     final token = await _getToken();
-    if (token == null) throw Exception('Not authenticated');
 
     final response = await http.get(
-      Uri.parse('$baseUrl/feed?page=$page&size=$size'),
+      Uri.parse('$baseUrl?page=$page&size=$size'),
       headers: {
-        'Authorization': 'Bearer $token',
+        if (token != null) 'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return List<Map<String, dynamic>>.from(data['reels'] ?? []);
+      // Backend returns paginated response with 'content' field
+      return List<Map<String, dynamic>>.from(data['content'] ?? []);
     } else {
       throw Exception('Failed to load reels feed');
     }

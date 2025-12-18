@@ -19,9 +19,10 @@ data class MessageDto(
     @JsonProperty("mediaUrl") val mediaUrl: String?,
     @JsonProperty("messageType") val messageType: MessageType,
     @JsonProperty("isRead") val isRead: Boolean,
-    @JsonProperty("createdAt") val createdAt: LocalDateTime
+    @JsonProperty("createdAt") val createdAt: String
 )
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class SendMessageRequest(
     @field:jakarta.validation.constraints.NotNull(message = "Receiver ID is required")
     @field:jakarta.validation.constraints.Positive(message = "Receiver ID must be positive")
@@ -50,6 +51,6 @@ fun Message.toDto(): MessageDto {
         mediaUrl = this.mediaUrl,
         messageType = this.messageType,
         isRead = this.isRead,
-        createdAt = this.createdAt
+        createdAt = this.createdAt.toString()
     )
 }

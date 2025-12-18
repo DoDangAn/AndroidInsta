@@ -78,30 +78,24 @@ class RedisConfig {
 
     @Bean
     fun cacheManager(connectionFactory: RedisConnectionFactory): CacheManager {
-        // Store everything as JSON strings - Spring will handle DTO → JSON conversion
-        // On retrieval, Spring returns JSON string, we parse it manually
+        // Use Generic serializer for all caches - handles DTOs automatically including FeedResponse
         val defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(Duration.ofHours(1))
             .serializeKeysWith(
                 RedisSerializationContext.SerializationPair.fromSerializer(StringRedisSerializer())
             )
             .serializeValuesWith(
-                RedisSerializationContext.SerializationPair.fromSerializer(StringRedisSerializer())
+                RedisSerializationContext.SerializationPair.fromSerializer(GenericJackson2JsonRedisSerializer(objectMapper()))
             )
             .disableCachingNullValues()
-            .prefixCacheNameWith("androidinsta:")
-
-        // Custom TTL for different cache types
-        val feedSerializer = Jackson2JsonRedisSerializer(FeedResponse::class.java)
-        feedSerializer.setObjectMapper(objectMapper())
+            .prefixCacheNameWith("androidinsta_v2:")
 
         val cacheConfigurations = mapOf(
             "users" to defaultConfig.entryTtl(Duration.ofMinutes(30)),
             "posts" to defaultConfig.entryTtl(Duration.ofMinutes(15)),
-            "feed" to defaultConfig.entryTtl(Duration.ofMinutes(5))
-                .serializeValuesWith(
-                    RedisSerializationContext.SerializationPair.fromSerializer(feedSerializer)
-                ),
+            "feed" to defaultConfig.entryTtl(Duration.ofMinutes(5)),
+            "userPosts" to defaultConfig.entryTtl(Duration.ofMinutes(10)),
+            "advertisePosts" to defaultConfig.entryTtl(Duration.ofMinutes(10)),
             "notifications" to defaultConfig.entryTtl(Duration.ofMinutes(10)),
             "search" to defaultConfig.entryTtl(Duration.ofMinutes(20)),
             "stats" to defaultConfig.entryTtl(Duration.ofHours(2))

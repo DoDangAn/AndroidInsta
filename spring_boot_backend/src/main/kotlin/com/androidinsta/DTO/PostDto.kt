@@ -23,8 +23,8 @@ data class PostDto(
     @JsonProperty("likeCount") val likeCount: Long = 0,
     @JsonProperty("commentCount") val commentCount: Long = 0,
     @JsonProperty("isLiked") val isLiked: Boolean = false,
-    @JsonProperty("createdAt") val createdAt: LocalDateTime?,
-    @JsonProperty("updatedAt") val updatedAt: LocalDateTime?
+    @JsonProperty("createdAt") val createdAt: String?,
+    @JsonProperty("updatedAt") val updatedAt: String?
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -70,8 +70,8 @@ fun Post.toDto(currentUserId: Long? = null): PostDto {
         isLiked = currentUserId?.let { userId ->
             this.likes.any { it.user.id == userId }
         } ?: false,
-        createdAt = this.createdAt,
-        updatedAt = this.updatedAt
+        createdAt = this.createdAt?.toString(),
+        updatedAt = this.updatedAt?.toString()
     )
 }
 

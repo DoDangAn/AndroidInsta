@@ -56,6 +56,7 @@ class SecurityConfig(
                     .requestMatchers("/error").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
                     .requestMatchers("/api/search/**").permitAll() // Allow search endpoints
+                    .requestMatchers("/api/db/**").permitAll() // Temporary DB checks
                     
                     // Admin endpoints
                     .requestMatchers("/api/admin/**").hasRole("ADMIN")

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/chat_service.dart';
 import '../services/user_service.dart';
-import '../models/chat_models.dart';
 import '../models/user_models.dart';
+import '../models/chat_models.dart';
 import 'chat_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -14,27 +13,75 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  final ChatService _chatService = ChatService();
-  List<Conversation> _conversations = [];
+  final TextEditingController _searchController = TextEditingController();
+  
+  List<UserProfile> _allChatableUsers = [];
+  List<UserProfile> _filteredUsers = [];
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadConversations();
+    _loadChatableUsers();
+    _searchController.addListener(_onSearchChanged);
   }
 
-  Future<void> _loadConversations() async {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredUsers = _allChatableUsers;
+      } else {
+        _filteredUsers = _allChatableUsers.where((user) {
+          final username = user.username.toLowerCase();
+          final fullName = (user.fullName ?? '').toLowerCase();
+          return username.contains(query) || fullName.contains(query);
+        }).toList();
+      }
+    });
+  }
+
+  Future<void> _loadChatableUsers() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      final conversations = await _chatService.getConversations();
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id') ?? 0;
+
+      final results = await Future.wait([
+        UserService.getFollowers(userId),
+        UserService.getFollowing(userId),
+      ]);
+
+      final followers = results[0];
+      final following = results[1];
+
+      // Use a map to deduplicate by ID
+      final userMap = <int, UserProfile>{};
+      for (var user in followers) {
+        userMap[user.id] = user;
+      }
+      for (var user in following) {
+        userMap[user.id] = user;
+      }
+
+      final uniqueUsers = userMap.values.toList();
+      // Sort alphabetically by username
+      uniqueUsers.sort((a, b) => a.username.compareTo(b.username));
+
       setState(() {
-        _conversations = conversations;
+        _allChatableUsers = uniqueUsers;
+        _filteredUsers = uniqueUsers;
         _isLoading = false;
       });
     } catch (e) {
@@ -48,19 +95,45 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Messages'),
+        title: const Text(
+          'Chat',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit_square),
-            onPressed: _showNewMessageDialog,
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadChatableUsers,
           ),
         ],
       ),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search friends...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
     );
   }
 
@@ -74,10 +147,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
             Text('Error: $_error'),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadConversations,
+              onPressed: _loadChatableUsers,
               child: const Text('Retry'),
             ),
           ],
@@ -85,16 +160,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
       );
     }
 
-    if (_conversations.isEmpty) {
-      return const Center(
+    if (_filteredUsers.isEmpty) {
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.message_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
+            Icon(Icons.people_outline, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
             Text(
-              'No messages yet',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
+              _searchController.text.isEmpty
+                  ? 'No friends found yet.\nFollow someone to start chatting!'
+                  : 'No friends matching your search.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[600]),
             ),
           ],
         ),
@@ -102,46 +180,50 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadConversations,
-      child: ListView.builder(
-        itemCount: _conversations.length,
+      onRefresh: _loadChatableUsers,
+      child: ListView.separated(
+        itemCount: _filteredUsers.length,
+        separatorBuilder: (context, index) => const Divider(height: 1, indent: 80),
         itemBuilder: (context, index) {
-          final conversation = _conversations[index];
-          return _buildConversationTile(conversation);
+          final user = _filteredUsers[index];
+          return _buildUserTile(user);
         },
       ),
     );
   }
 
-  Widget _buildConversationTile(Conversation conversation) {
-    final user = conversation.user;
-    final lastMessage = conversation.lastMessage;
-    final unreadCount = conversation.unreadCount;
-
+  Widget _buildUserTile(UserProfile user) {
     return ListTile(
-      onTap: () async {
-        // Navigate to chat screen
-        final result = await Navigator.push(
+      onTap: () {
+        // Convert UserProfile to UserSummary
+        final userSummary = UserSummary(
+          id: user.id,
+          username: user.username,
+          fullName: user.fullName,
+          avatarUrl: user.avatarUrl,
+        );
+
+        Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ChatScreen(user: user),
+            builder: (context) => ChatScreen(user: userSummary),
           ),
         );
-        
-        // Reload conversations if message was sent
-        if (result == true) {
-          _loadConversations();
-        }
       },
       leading: CircleAvatar(
-        radius: 28,
+        radius: 30,
         backgroundImage: user.avatarUrl != null
             ? NetworkImage(user.avatarUrl!)
             : null,
+        backgroundColor: Colors.grey[200],
         child: user.avatarUrl == null
             ? Text(
-                user.username[0].toUpperCase(),
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                user.username.isNotEmpty ? user.username[0].toUpperCase() : '?',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
               )
             : null,
       ),
@@ -150,328 +232,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
           Expanded(
             child: Text(
               user.fullName ?? user.username,
-              style: TextStyle(
-                fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
-          if (lastMessage != null)
-            Text(
-              _formatTimestamp(lastMessage.createdAt),
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
-            ),
+          if (user.isVerified) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.verified, color: Colors.blue, size: 16),
+          ],
         ],
       ),
-      subtitle: Row(
-        children: [
-          Expanded(
-            child: Text(
-              lastMessage?.content ?? 'No messages yet',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: unreadCount > 0 ? Colors.black : Colors.grey[600],
-                fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ),
-          if (unreadCount > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                unreadCount.toString(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-        ],
+      subtitle: Text(
+        '@${user.username}',
+        style: TextStyle(color: Colors.grey[600]),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    );
-  }
-
-  String _formatTimestamp(String timestamp) {
-    try {
-      final dateTime = DateTime.parse(timestamp);
-      final now = DateTime.now();
-      final difference = now.difference(dateTime);
-
-      if (difference.inDays == 0) {
-        return '${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
-      } else if (difference.inDays == 1) {
-        return 'Yesterday';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays}d ago';
-      } else {
-        return '${dateTime.day}/${dateTime.month}';
-      }
-    } catch (e) {
-      return '';
-    }
-  }
-
-  Future<void> _showNewMessageDialog() async {
-    // Get current user ID
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('user_id') ?? 0;
-
-    // Load both following and followers (1 trong 2 follow là được chat)
-    List<UserProfile> chatableUsers = [];
-    try {
-      final following = await UserService.getFollowing(userId);
-      final followers = await UserService.getFollowers(userId);
-      
-      // Combine và remove duplicates
-      final userMap = <int, UserProfile>{};
-      for (var user in following) {
-        userMap[user.id] = user;
-      }
-      for (var user in followers) {
-        userMap[user.id] = user;
-      }
-      chatableUsers = userMap.values.toList();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading users: $e')),
-      );
-      return;
-    }
-
-    if (!mounted) return;
-
-    if (chatableUsers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No one to chat with. Follow someone or get followed first!')),
-      );
-      return;
-    }
-
-    // Show dialog with chatable users
-    showDialog(
-      context: context,
-      builder: (context) => _NewMessageDialog(following: chatableUsers),
-    );
-  }
-
-  bool _isUserOnline(int userId) {
-    // TODO: Implement real online status from WebSocket
-    // For now, show users with even IDs as online
-    return userId % 2 == 0;
-  }
-}
-
-class _NewMessageDialog extends StatefulWidget {
-  final List<UserProfile> following;
-
-  const _NewMessageDialog({required this.following});
-
-  @override
-  State<_NewMessageDialog> createState() => _NewMessageDialogState();
-}
-
-class _NewMessageDialogState extends State<_NewMessageDialog> {
-  final TextEditingController _searchController = TextEditingController();
-  List<UserProfile> _filteredFollowing = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _filteredFollowing = widget.following;
-    _searchController.addListener(_filterFollowing);
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _filterFollowing() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      if (query.isEmpty) {
-        _filteredFollowing = widget.following;
-      } else {
-        _filteredFollowing = widget.following.where((user) {
-          return user.username.toLowerCase().contains(query) ||
-                 (user.fullName?.toLowerCase().contains(query) ?? false);
-        }).toList();
-      }
-    });
-  }
-
-  bool _isUserOnline(int userId) {
-    return userId % 2 == 0;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Header
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'New Message',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            // Search bar
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.grey[200],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // Following list
-            Expanded(
-              child: _filteredFollowing.isEmpty
-                  ? Center(
-                      child: Text(
-                        _searchController.text.isEmpty
-                            ? 'No one to message'
-                            : 'No users found',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _filteredFollowing.length,
-                      itemBuilder: (context, index) {
-                        final user = _filteredFollowing[index];
-                        final isOnline = _isUserOnline(user.id);
-                        
-                        return ListTile(
-                          leading: Stack(
-                            children: [
-                              CircleAvatar(
-                                radius: 25,
-                                backgroundImage: user.avatarUrl != null
-                                    ? NetworkImage(user.avatarUrl!)
-                                    : null,
-                                backgroundColor: Colors.grey[300],
-                                child: user.avatarUrl == null
-                                    ? Text(
-                                        user.username[0].toUpperCase(),
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                              // Online indicator
-                              if (isOnline)
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    width: 14,
-                                    height: 14,
-                                    decoration: BoxDecoration(
-                                      color: Colors.green,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 2,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          title: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  user.fullName ?? user.username,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                              if (isOnline)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Text(
-                                    'Online',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          subtitle: Text(
-                            user.username,
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                          onTap: () {
-                            Navigator.pop(context); // Close dialog
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChatScreen(
-                                  user: UserSummary(
-                                    id: user.id,
-                                    username: user.username,
-                                    fullName: user.fullName,
-                                    avatarUrl: user.avatarUrl,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

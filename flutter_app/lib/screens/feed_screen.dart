@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/post_service.dart';
 import '../models/post_models.dart';
+import 'create_reel_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -350,6 +351,16 @@ class _FeedScreenState extends State<FeedScreen> {
             icon: const Icon(Icons.add_box_outlined),
             onPressed: () {
               Navigator.pushNamed(context, '/create-post');
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.videocam_outlined),
+            tooltip: 'Create Reel',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreateReelScreen()),
+              );
             },
           ),
         ],

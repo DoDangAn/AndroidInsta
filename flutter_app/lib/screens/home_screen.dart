@@ -12,6 +12,7 @@ import 'search_screen.dart';
 import 'notification_screen.dart';
 import 'post_detail_screen.dart';
 import 'chat_list_screen.dart';
+import 'create_reel_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   List<PostDto> _posts = [];
   List<UserProfile> _following = [];
+  UserProfile? _currentUser;
   bool _isLoading = true;
   bool _isFollowingLoading = true;
   int _userId = 0;
@@ -31,9 +33,30 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserId();
-    _loadPosts();
-    _loadFollowing();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await _loadUserId();
+    // Load currentUser profile and lists in parallel once userId is known
+    await Future.wait([
+      _loadCurrentUser(),
+      _loadFollowing(),
+      _loadPosts(),
+    ]);
+  }
+
+  Future<void> _loadCurrentUser() async {
+    try {
+      final user = await UserService.getCurrentProfile();
+      if (mounted) {
+        setState(() {
+          _currentUser = user;
+        });
+      }
+    } catch (e) {
+      print('Error loading current user: $e');
+    }
   }
 
   Future<void> _loadFollowing() async {
@@ -183,6 +206,8 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: Colors.white,
             elevation: 0,
             floating: true,
+            pinned: true,
+            snap: true,
             title: const Text(
               'Instagram',
               style: TextStyle(
@@ -273,26 +298,58 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Column(
                 children: [
-                  Container(
-                    width: 65,
-                    height: 65,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.grey[300]!,
-                        width: 2,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(2),
-                      child: Container(
+                  Stack(
+                    children: [
+                      Container(
+                        width: 65,
+                        height: 65,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.grey[300],
+                          border: Border.all(
+                            color: Colors.grey[300]!,
+                            width: 2,
+                          ),
                         ),
-                        child: const Icon(Icons.add, color: Colors.black),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: CircleAvatar(
+                            radius: 30,
+                            backgroundColor: Colors.grey[300],
+                            backgroundImage: _currentUser?.avatarUrl != null
+                                ? NetworkImage(_currentUser!.avatarUrl!)
+                                : null,
+                            child: _currentUser?.avatarUrl == null
+                                ? Text(
+                                    (_currentUser?.username ?? 'U').isNotEmpty
+                                        ? (_currentUser?.username[0].toUpperCase() ?? 'U')
+                                        : 'U',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ),
                       ),
-                    ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.blue,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   const SizedBox(
@@ -855,6 +912,30 @@ class _HomeScreenState extends State<HomeScreen> {
               label: const Text('Select Photo'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () async {
+                if (!mounted) return;
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CreateReelScreen(),
+                  ),
+                );
+                
+                // Reload if reel was uploaded successfully
+                if (result == true) {
+                  _loadPosts();
+                }
+              },
+              icon: const Icon(Icons.video_library),
+              label: const Text('Create Reel'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               ),

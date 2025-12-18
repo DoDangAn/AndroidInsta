@@ -10,7 +10,7 @@ class SearchService {
   // Get auth token
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
+    return prefs.getString('access_token');
   }
 
   // Get headers with auth token

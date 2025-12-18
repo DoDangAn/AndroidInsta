@@ -77,7 +77,7 @@ class MessageController(
                 avatarUrl = partner.avatarUrl,
                 fullName = partner.fullName,
                 lastMessage = lastMessage?.content,
-                lastMessageTime = lastMessage?.createdAt,
+                lastMessageTime = lastMessage?.createdAt?.toString(),
                 unreadCount = unreadCount.toInt()
             )
         }

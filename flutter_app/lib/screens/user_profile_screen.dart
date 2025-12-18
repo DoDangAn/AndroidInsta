@@ -59,6 +59,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
       
+      print('=== DEBUGGING TOKEN ===');
+      print('Access token: $token');
+      if (token == null) {
+        print('ERROR: Access token is null. Please ensure the user is logged in.');
+      }
+      
       bool isFollowing = false;
       int followersCount = 0;
       int followingCount = 0;
@@ -302,7 +308,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               backgroundColor: Colors.grey[300],
               child: _userProfile!.avatarUrl == null
                   ? Text(
-                      _userProfile!.username[0].toUpperCase(),
+                      _userProfile!.username.isNotEmpty 
+                          ? _userProfile!.username[0].toUpperCase()
+                          : 'U',
                       style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
                     )
                   : null,

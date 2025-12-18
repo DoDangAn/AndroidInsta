@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/search_models.dart';
@@ -20,6 +21,7 @@ class _SearchScreenState extends State<SearchScreen>
     with SingleTickerProviderStateMixin {
   final SearchService _searchService = SearchService();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
 
   late TabController _tabController;
   String _searchQuery = '';
@@ -50,6 +52,7 @@ class _SearchScreenState extends State<SearchScreen>
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     _tabController.dispose();
     super.dispose();
@@ -189,7 +192,11 @@ class _SearchScreenState extends State<SearchScreen>
     setState(() {
       _searchQuery = value;
     });
-    _loadSuggestions(value);
+    // Debounce suggestions to avoid excessive requests
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _loadSuggestions(value);
+    });
   }
 
   void _onSearchSubmitted(String value) {
@@ -318,7 +325,7 @@ class _SearchScreenState extends State<SearchScreen>
             ? NetworkImage(user.avatarUrl!)
             : null,
         child: user.avatarUrl == null
-            ? Text(user.username[0].toUpperCase())
+            ? Text(user.username.isNotEmpty ? user.username[0].toUpperCase() : 'U')
             : null,
       ),
       title: Row(
@@ -575,7 +582,7 @@ class _SearchScreenState extends State<SearchScreen>
             ? NetworkImage(user.avatarUrl!)
             : null,
         child: user.avatarUrl == null
-            ? Text(user.username[0].toUpperCase())
+            ? Text(user.username.isNotEmpty ? user.username[0].toUpperCase() : 'U')
             : null,
       ),
       title: Row(

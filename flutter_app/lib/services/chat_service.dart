@@ -43,6 +43,7 @@ class ChatService {
     final token = prefs.getString('access_token');
     
     if (token == null) throw Exception('Not authenticated');
+    print('🔑 Sending token for chat history: ${token.substring(0, 10)}...');
     
     final response = await http.get(
       Uri.parse('$baseUrl/api/messages/chat/$userId?page=$page&size=$size'),
@@ -53,6 +54,7 @@ class ChatService {
     );
     
     if (response.statusCode == 200) {
+      print('📥 Raw chat history response: ${response.body}');
       final data = json.decode(response.body);
       if (data['success'] == true) {
         return ChatHistory.fromJson(data['data']);

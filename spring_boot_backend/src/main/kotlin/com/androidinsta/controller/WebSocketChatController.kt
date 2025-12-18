@@ -31,31 +31,48 @@ class WebSocketChatController(
      */
     @MessageMapping("/chat")
     fun handleChatMessage(
-        @Payload request: SendMessageRequest,
+        @Payload rawPayload: String,
         headerAccessor: SimpMessageHeaderAccessor,
         principal: Principal?
     ) {
+        println("WS Controller: RAW JSON received: $rawPayload")
+        
         val senderId = principal?.name?.toLongOrNull()
             ?: throw IllegalStateException("User not authenticated")
+            
+        // Parse JSON manually
+        val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+        val jsonNode = mapper.readTree(rawPayload)
         
+        val receiverId = jsonNode.get("receiverId")?.asLong() 
+            ?: throw IllegalArgumentException("Missing receiverId")
+            
+        val content = jsonNode.get("content")?.asText()
+        val mediaUrl = jsonNode.get("mediaUrl")?.asText()
+        
+        val messageTypeStr = jsonNode.get("messageType")?.asText() ?: "text"
         val messageType = try {
-            MessageType.valueOf(request.messageType.lowercase())
+            MessageType.valueOf(messageTypeStr.lowercase())
         } catch (e: Exception) {
             MessageType.text
         }
         
+        println("WS Controller: Parsed - receiverId=$receiverId, content=$content, type=$messageType")
+        
+        println("WS Controller: Saving message...")
         val message = messageService.sendMessage(
             senderId = senderId,
-            receiverId = request.receiverId,
-            content = request.content,
-            mediaUrl = request.mediaUrl,
+            receiverId = receiverId,
+            content = content,
+            mediaUrl = mediaUrl,
             messageType = messageType
         )
+        println("WS Controller: Message saved with ID ${message.id}")
         
         val messageDto = message.toDto()
 
         messagingTemplate.convertAndSendToUser(
-            request.receiverId.toString(),
+            receiverId.toString(),
             "/queue/messages",
             messageDto
         )
@@ -92,6 +109,16 @@ class WebSocketChatController(
             )
         )
     }
+    
+    /**
+     * Exception handler for WebSocket errors
+     */
+    @org.springframework.messaging.handler.annotation.MessageExceptionHandler
+    fun handleException(exception: Exception): String {
+        println("❌ WebSocket Error: ${exception.javaClass.simpleName}: ${exception.message}")
+        exception.printStackTrace()
+        return "Error: ${exception.message}"
+    }
 }
 
 /**
@@ -109,3 +136,4 @@ data class TypingIndicatorResponse(
     val senderId: Long,
     val isTyping: Boolean
 )
+

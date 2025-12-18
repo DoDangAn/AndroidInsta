@@ -43,7 +43,7 @@ class ChatController(
                 avatarUrl = partner.avatarUrl,
                 fullName = partner.fullName,
                 lastMessage = lastMessage?.content,
-                lastMessageTime = lastMessage?.createdAt,
+                lastMessageTime = lastMessage?.createdAt?.toString(),
                 unreadCount = messageService.countUnreadMessages(userId, partnerId).toInt()
             )
         }

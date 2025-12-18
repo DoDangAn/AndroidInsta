@@ -31,9 +31,11 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCurrentUser();
-    _loadMessages();
-    _connectWebSocket();
+    // Ensure current user id is loaded before fetching messages or connecting
+    _loadCurrentUser().then((_) {
+      _loadMessages();
+      _connectWebSocket();
+    });
     _messageController.addListener(_onTyping);
   }
 
@@ -56,6 +58,7 @@ class _ChatScreenState extends State<ChatScreen> {
         body: json.encode({
           'receiverId': widget.user.id,
           'isTyping': isTyping,
+          'senderId': _currentUserId,
         }),
       );
     }
@@ -70,16 +73,22 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadMessages() async {
     try {
+      print('📥 Loading messages for user ${widget.user.id}...');
       setState(() {
         _isLoading = true;
         _error = null;
       });
 
       final history = await _chatService.getChatHistory(widget.user.id);
+      print('✅ Loaded ${history.messages.length} messages from history');
       
       if (mounted) {
         setState(() {
-          _messages = history.messages.reversed.toList(); // Show oldest first (top) to newest (bottom)
+          // Keep optimistic messages (id == 0)
+          final optimisticMessages = _messages.where((m) => m.id == 0).toList();
+          final historyMessages = history.messages.reversed.toList();
+          
+          _messages = [...historyMessages, ...optimisticMessages];
           _isLoading = false;
         });
         
@@ -92,6 +101,7 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     } catch (e) {
+      print('❌ Error loading messages: $e');
       if (mounted) {
         setState(() {
           _error = e.toString();
@@ -105,10 +115,14 @@ class _ChatScreenState extends State<ChatScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     
-    if (token == null) return;
+    if (token == null) {
+      print('❌ No access token found, skipping WebSocket connection');
+      return;
+    }
 
     // Use 10.0.2.2 for Android emulator, localhost for iOS simulator
     const wsUrl = 'ws://10.0.2.2:8081/ws/websocket';
+    print('🔌 Connecting to WebSocket at $wsUrl...');
 
     _stompClient = StompClient(
       config: StompConfig(
@@ -125,28 +139,42 @@ class _ChatScreenState extends State<ChatScreen> {
           _stompClient?.subscribe(
             destination: '/user/queue/messages',
             callback: (frame) {
+              print('📩 Received message via WebSocket: ${frame.body}');
               if (frame.body != null) {
                 try {
                   final data = json.decode(frame.body!);
                   final message = ChatMessage.fromJson(data);
                   
-                  // Only add message if it belongs to this conversation
-                  if (message.sender.id == widget.user.id || 
-                      message.receiver.id == widget.user.id) {
+                  // Avoid duplicates by checking ID or content/timestamp
+                  bool isDuplicate = _messages.any((m) => 
+                      (m.id == message.id && message.id != 0) || 
+                      (m.content == message.content && m.sender.id == message.sender.id && 
+                       m.id == 0)); // Match optimistic messages
+                      
+                  if (!isDuplicate && (message.sender.id == widget.user.id || 
+                      message.receiver.id == widget.user.id ||
+                      message.sender.id == _currentUserId)) {
                     if (mounted) {
                       setState(() {
-                        _messages.add(message);
+                        // Replace optimistic message if it exists
+                        int optimisticIndex = _messages.indexWhere((m) => 
+                          m.id == 0 && m.content == message.content && m.sender.id == message.sender.id);
+                        
+                        if (optimisticIndex != -1) {
+                          _messages[optimisticIndex] = message;
+                        } else {
+                          _messages.add(message);
+                        }
                       });
                       _scrollToBottom();
                       
-                      // Mark as read if it's from the other user
                       if (message.sender.id == widget.user.id) {
                         _markAsRead();
                       }
                     }
                   }
                 } catch (e) {
-                  print('Error parsing message: $e');
+                  print('❌ Error parsing WebSocket message: $e');
                 }
               }
             },
@@ -170,7 +198,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     print('${widget.user.username} is ${isTyping ? "typing" : "not typing"}');
                   }
                 } catch (e) {
-                  print('Error parsing typing indicator: $e');
+                  print('❌ Error parsing typing indicator: $e');
                 }
               }
             },
@@ -216,7 +244,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       await _chatService.markAsRead(widget.user.id);
     } catch (e) {
-      print('Error marking as read: $e');
+      print('⚠️ Error marking as read: $e');
     }
   }
 
@@ -227,39 +255,53 @@ class _ChatScreenState extends State<ChatScreen> {
     // Clear input immediately
     _messageController.clear();
 
+    // Optimistically add message to UI
+    final optimisticMessage = ChatMessage(
+      id: 0,
+      content: content,
+      messageType: 'TEXT',
+      sender: UserSummary(
+        id: _currentUserId ?? 0,
+        username: 'Me',
+      ),
+      receiver: widget.user,
+      isRead: false,
+      createdAt: DateTime.now().toIso8601String(),
+    );
+
+    setState(() {
+      _messages.add(optimisticMessage);
+    });
+    _scrollToBottom();
+
+
     try {
-      if (_stompClient != null && _stompClient!.connected) {
-        // Send via WebSocket STOMP
-        _stompClient!.send(
-          destination: '/app/chat',
-          body: json.encode({
-            'receiverId': widget.user.id,
-            'content': content,
-            'messageType': 'TEXT',
-          }),
-        );
-        
-        // Optimistically add message to UI
-        // The real message will come back via WebSocket subscription
-      } else {
-        // Fallback to REST API if WebSocket is disconnected
-        print('WebSocket not connected, using REST API fallback');
-        final message = await _chatService.sendMessage(widget.user.id, content);
-        setState(() {
-          _messages.add(message);
-        });
-        _scrollToBottom();
-      }
+      // Always use REST API for sending (more reliable than WebSocket STOMP)
+      // WebSocket is only used for receiving real-time messages
+      print('📤 Sending message via REST API...');
+      final message = await _chatService.sendMessage(widget.user.id, content);
+      setState(() {
+        // Replace optimistic message with real message from server
+        int index = _messages.indexOf(optimisticMessage);
+        if (index != -1) {
+          _messages[index] = message;
+        }
+      });
+      _scrollToBottom();
     } catch (e) {
+      print('❌ Error sending message: $e');
       if (mounted) {
+        // remove optimistic message on error
+        setState(() {
+          _messages.remove(optimisticMessage);
+        });
+
         String errorMessage = 'Không thể gửi tin nhắn';
         if (e.toString().contains('Exception:')) {
           errorMessage = e.toString().replaceFirst('Exception: ', '');
         } else {
           errorMessage = e.toString();
         }
-        
-        print('Error sending message: $e');
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -387,6 +429,14 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            color: Colors.yellow[100],
+            child: Text(
+              'Debug: Me=$_currentUserId, Target=${widget.user.id}, Conn=$_isConnected',
+              style: const TextStyle(fontSize: 10, color: Colors.black54),
+            ),
+          ),
           Expanded(child: _buildMessageList()),
           _buildMessageInput(),
         ],
@@ -423,7 +473,7 @@ class _ChatScreenState extends State<ChatScreen> {
             const Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
-              'No messages yet',
+              'No messages yet (${_messages.length} total)',
               style: TextStyle(fontSize: 18, color: Colors.grey[600]),
             ),
             const SizedBox(height: 8),

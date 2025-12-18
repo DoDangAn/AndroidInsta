@@ -28,7 +28,7 @@ data class ConversationDto(
     @JsonProperty("fullName") val fullName: String?,
     @JsonProperty("avatarUrl") val avatarUrl: String?,
     @JsonProperty("lastMessage") val lastMessage: String?,
-    @JsonProperty("lastMessageTime") val lastMessageTime: java.time.LocalDateTime?,
+    @JsonProperty("lastMessageTime") val lastMessageTime: String?,
     @JsonProperty("unreadCount") val unreadCount: Int = 0
 )
 

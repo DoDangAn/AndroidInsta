@@ -20,7 +20,7 @@ class AuthData {
     return AuthData(
       accessToken: json['accessToken'] ?? '',
       refreshToken: json['refreshToken'] ?? '',
-      user: UserProfile.fromJson(json['user']),
+      user: json['user'] != null ? UserProfile.fromJson(json['user']) : UserProfile.empty(),
     );
   }
 }
@@ -39,8 +39,13 @@ class LoginService {
     );
 
     if (response.statusCode == 200) {
-      return AuthData.fromJson(jsonDecode(response.body));
+      print('Login response: ${response.body}'); // Log response body
+      final jsonResponse = jsonDecode(response.body);
+      // Backend wraps response in {success, message, data}
+      final data = jsonResponse['data'] ?? jsonResponse;
+      return AuthData.fromJson(data);
     } else {
+      print('Login error: ${response.statusCode}, ${response.body}'); // Log error details
       throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
   }
@@ -58,7 +63,9 @@ class LoginService {
     );
 
     if (response.statusCode == 200) {
-      return AuthData.fromJson(jsonDecode(response.body));
+      final jsonResponse = jsonDecode(response.body);
+      final data = jsonResponse['data'] ?? jsonResponse;
+      return AuthData.fromJson(data);
     } else {
       throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
@@ -82,7 +89,9 @@ class LoginService {
     );
 
     if (response.statusCode == 201) {
-      return AuthData.fromJson(jsonDecode(response.body));
+      final jsonResponse = jsonDecode(response.body);
+      final data = jsonResponse['data'] ?? jsonResponse;
+      return AuthData.fromJson(data);
     } else {
       throw ApiErrorParser.parseError(response.statusCode, response.body);
     }
